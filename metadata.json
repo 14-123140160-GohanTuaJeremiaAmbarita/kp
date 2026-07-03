@@ -1,0 +1,6 @@
+{
+  "name": "Smart IT Assistant PT Voksel Electric Tbk",
+  "description": "Enterprise AI Assistant for IT management at PT Voksel Electric Tbk, demonstrating separate production (readonly) and AI support databases.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
