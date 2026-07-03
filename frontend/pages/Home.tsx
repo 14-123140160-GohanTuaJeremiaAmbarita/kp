@@ -371,6 +371,7 @@ export default function Home({ user, onLogout }: HomeProps) {
             selectedModel={selectedModel}
             setSelectedModel={setSelectedModel}
             theme={theme}
+            hasMessages={messages.length > 0}
           />
         </div>
       )}

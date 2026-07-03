@@ -1,4 +1,4 @@
-import React, { FormEvent, KeyboardEvent } from 'react';
+import React, { FormEvent, KeyboardEvent, useState, useEffect } from 'react';
 import { Send } from 'lucide-react';
 import ModelSelector, { MODEL_WHITELIST } from './ModelSelector';
 
@@ -11,7 +11,18 @@ interface ChatInputProps {
   selectedModel: string;
   setSelectedModel: (model: string) => void;
   theme?: 'light' | 'dark';
+  hasMessages: boolean;
 }
+
+const PLACEHOLDERS = [
+  "Tanyakan data IT (misal: 'siapa pemegang komputer COM-001?')",
+  "Cari komputer (misal: 'komputer dengan merk Lenovo')",
+  "Cari karyawan (misal: 'divisi IT Support')",
+  "Tanyakan tiket IT (misal: 'tiket dari departemen GA')",
+  "Tanyakan aset (misal: 'jumlah laptop yang aktif')",
+  "Tanyakan tindakan (misal: 'tindakan perbaikan TD_WO')",
+  "Coba tanyakan: 'apa fungsi divisi HRD?'"
+];
 
 export default function ChatInput({
   inputMessage,
@@ -22,8 +33,34 @@ export default function ChatInput({
   selectedModel,
   setSelectedModel,
   theme,
+  hasMessages,
 }: ChatInputProps) {
   const isDark = theme === 'dark';
+  const [showDueToInactivity, setShowDueToInactivity] = useState(false);
+  const [placeholderText, setPlaceholderText] = useState(PLACEHOLDERS[0]);
+
+  const rotatePlaceholder = () => {
+    setPlaceholderText(prev => {
+      const idx = PLACEHOLDERS.indexOf(prev);
+      const nextIdx = (idx + 1) % PLACEHOLDERS.length;
+      return PLACEHOLDERS[nextIdx];
+    });
+  };
+
+  useEffect(() => {
+    setShowDueToInactivity(false);
+    
+    const timeoutId = setTimeout(() => {
+      if (!inputMessage.trim()) {
+        setShowDueToInactivity(true);
+        rotatePlaceholder();
+      }
+    }, 30000); // 30 detik
+
+    return () => clearTimeout(timeoutId);
+  }, [inputMessage, hasMessages]);
+
+  const activePlaceholder = (!hasMessages || showDueToInactivity) ? placeholderText : "";
 
   const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
@@ -58,7 +95,8 @@ export default function ChatInput({
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Tanyakan data IT (misal: 'siapa pemegang komputer COM-001?' atau 'tampilkan tiket Open')"
+            onMouseLeave={rotatePlaceholder}
+            placeholder={activePlaceholder}
             className={`w-full resize-none bg-transparent py-2.5 px-3.5 text-xs outline-none placeholder:text-slate-500 custom-scrollbar max-h-32 transition-colors ${
               isDark ? 'text-slate-100' : 'text-slate-800'
             }`}

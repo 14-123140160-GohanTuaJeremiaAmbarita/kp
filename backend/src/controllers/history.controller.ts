@@ -7,7 +7,8 @@ export class HistoryController {
   // Conversations
   public getConversations = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const list = await this.historyService.getConversations();
+      const user = (req as any).user;
+      const list = await this.historyService.getConversations(user?.NIK);
       res.json({ success: true, conversations: list });
     } catch (error) {
       next(error);
@@ -60,7 +61,8 @@ export class HistoryController {
   public getMemories = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const conversationId = req.query.conversationId as string;
-      const list = await this.historyService.getMemoriesForUser(conversationId);
+      const user = (req as any).user;
+      const list = await this.historyService.getMemoriesForUser(conversationId, user?.NIK);
       res.json({ success: true, memories: list });
     } catch (error) {
       next(error);

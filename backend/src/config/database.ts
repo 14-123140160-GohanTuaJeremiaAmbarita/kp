@@ -143,6 +143,35 @@ async function ensureRealHistoryTablesExist(pool: mssql.ConnectionPool) {
       )
     `);
 
+    // 6. TD_users (for Auth storage in SmartIT_AI)
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='TD_users' AND xtype='U')
+      CREATE TABLE TD_users (
+        username VARCHAR(50) PRIMARY KEY,
+        nama VARCHAR(100) NOT NULL,
+        dept VARCHAR(100) NOT NULL,
+        password VARCHAR(100) NOT NULL
+      )
+    `);
+
+    // Seed default admin in SmartIT_AI if table is empty or admin doesn't exist
+    const adminCheck = await pool.request().query("SELECT COUNT(*) as count FROM TD_users WHERE username = 'admin'");
+    if (adminCheck.recordset && adminCheck.recordset[0].count === 0) {
+      console.log("[Database Bootstrap] Seeding default admin user in SmartIT_AI TD_users table");
+      await pool.request().query(`
+        INSERT INTO TD_users (username, nama, dept, password)
+        VALUES ('admin', 'Gohan Admin', 'IT Support', '$2b$10$tMh4E/8bNnU1u592xWep/.7E27gT60J.MsknI8Q/W3YvX3Z6F0vKy')
+      `);
+    }
+
+    const devCheck = await pool.request().query("SELECT COUNT(*) as count FROM TD_users WHERE username = 'VOK001'");
+    if (devCheck.recordset && devCheck.recordset[0].count === 0) {
+      await pool.request().query(`
+        INSERT INTO TD_users (username, nama, dept, password)
+        VALUES ('VOK001', 'Gohan Admin', 'IT Support', '$2b$10$tMh4E/8bNnU1u592xWep/.7E27gT60J.MsknI8Q/W3YvX3Z6F0vKy')
+      `);
+    }
+
   } catch (err: any) {
     console.error('[SQL Server Error] Failed to bootstrap SmartIT_AI tables:', err.message);
   }
@@ -272,11 +301,19 @@ export class Database {
   }
 
   // --- AI_Conversation ---
-  public async getConversations(): Promise<Conversation[]> {
+  public async getConversations(userNik?: string): Promise<Conversation[]> {
     const pool = getHistoryDbPool();
     if (pool) {
       try {
-        const res = await pool.request().query('SELECT ConversationId, Title, CreatedBy, IsPinned, IsArchived, CreatedAt FROM AI_Conversation WHERE IsArchived = 0 ORDER BY CreatedAt DESC');
+        let query = 'SELECT TOP 50 ConversationId, Title, CreatedBy, IsPinned, IsArchived, CreatedAt FROM AI_Conversation WHERE IsArchived = 0';
+        const request = pool.request();
+        if (userNik) {
+          query += ' AND CreatedBy = @userNik';
+          request.input('userNik', mssql.VarChar(50), userNik);
+        }
+        query += ' ORDER BY CreatedAt DESC';
+
+        const res = await request.query(query);
         return res.recordset.map((row: any) => ({
           ConversationID: String(row.ConversationId).toLowerCase(),
           Title: row.Title,
@@ -512,15 +549,19 @@ export class Database {
   }
 
   // --- TD_MEMORY (Personal Fact Context) ---
-  public async getMemories(conversationId?: string): Promise<Memory[]> {
+  public async getMemories(conversationId?: string, userNik?: string): Promise<Memory[]> {
     const pool = getHistoryDbPool();
     if (pool) {
       try {
-        let query = 'SELECT MemoryID, UserNIK, ConversationID, FactText, CreatedDate FROM TD_MEMORY';
+        let query = 'SELECT MemoryID, UserNIK, ConversationID, FactText, CreatedDate FROM TD_MEMORY WHERE 1=1';
         const req = pool.request();
         if (conversationId) {
-          query += ' WHERE ConversationID = @convId';
+          query += ' AND ConversationID = @convId';
           req.input('convId', mssql.VarChar(50), conversationId);
+        }
+        if (userNik) {
+          query += ' AND UserNIK = @userNik';
+          req.input('userNik', mssql.VarChar(50), userNik);
         }
         const res = await req.query(query);
         return res.recordset;
@@ -647,66 +688,144 @@ export class Database {
 
   // --- Verify Employee Login Credentials ---
   public async verifyEmployeeLogin(nrp: string, pass: string): Promise<Karyawan | null> {
-    const pool = getCompanyDbPool();
+    const pool = getHistoryDbPool();
+    if (!pool) {
+      throw new Error('Koneksi database SmartIT_AI tidak terhubung. Silakan restart backend server Anda agar memuat file .env yang baru.');
+    }
+
+    try {
+      console.log(`[Database Bridge] Verifying employee credentials in database for Username: ${nrp}`);
+      const res = await pool.request()
+        .input('username', mssql.VarChar(50), nrp)
+        .query('SELECT username, nama, dept, password FROM TD_users WHERE username = @username');
+
+      if (res.recordset && res.recordset.length > 0) {
+        const row = res.recordset[0];
+        const dbPass = row.password ? row.password.trim() : '';
+
+        let isMatch = false;
+        let needsMigration = false;
+
+        // 1. Verify password using bcrypt compare
+        try {
+          const { comparePassword } = require('../utils/auth');
+          isMatch = await comparePassword(pass, dbPass);
+        } catch (bcryptErr) {
+          console.warn('[Database] Bcrypt comparison failed, falling back to plain text check:', bcryptErr);
+        }
+
+        // 2. Fallback check for legacy plain text passwords (Lazy migration check)
+        if (!isMatch && dbPass === pass) {
+          isMatch = true;
+          needsMigration = true;
+        }
+
+        if (isMatch) {
+          // Lazy migration: if password matched plain text, or isn't formatted as bcrypt, write hash back
+          if (needsMigration || !dbPass.startsWith('$2b$')) {
+            try {
+              const { hashPassword } = require('../utils/auth');
+              const hashedPass = await hashPassword(pass);
+              console.log(`[Database Bridge] Lazy migrating password to Bcrypt hash for user: ${nrp}`);
+              await pool.request()
+                .input('username', mssql.VarChar(50), nrp)
+                .input('hashedPass', mssql.VarChar(100), hashedPass)
+                .query('UPDATE TD_users SET password = @hashedPass WHERE username = @username');
+            } catch (migrateErr: any) {
+              console.error('[Database] Failed to lazy migrate employee password:', migrateErr.message);
+            }
+          }
+
+          return {
+            NIK: row.username ? row.username.trim() : '',
+            Nama: row.nama ? row.nama.trim() : '',
+            Departemen: row.dept ? row.dept.trim() : '',
+            Jabatan: row.dept && row.dept.toLowerCase().includes('it') ? 'IT Support' : 'Employee',
+            Email: row.username ? `${row.username.trim().toLowerCase()}@voksel.co.id` : '',
+            Status: 'Active'
+          };
+        }
+      }
+    } catch (err: any) {
+      console.error('[Database] Failed to verify employee login:', err.message);
+      throw err;
+    }
+    return null;
+  }
+
+  // --- Register New Employee ---
+  public async registerEmployee(nrp: string, name: string, dept: string, pass: string): Promise<Karyawan | null> {
+    const pool = getHistoryDbPool();
+    if (!pool) {
+      throw new Error('Koneksi database SmartIT_AI tidak terhubung. Silakan restart backend server Anda agar memuat file .env yang baru.');
+    }
+
+    try {
+      const { hashPassword } = require('../utils/auth');
+      const hashedPass = await hashPassword(pass);
+
+      console.log(`[Database Bridge] Registering new user ${nrp} in database`);
+      await pool.request()
+        .input('username', mssql.VarChar(50), nrp)
+        .input('name', mssql.VarChar(100), name)
+        .input('dept', mssql.VarChar(100), dept)
+        .input('pass', mssql.VarChar(100), hashedPass)
+        .query('INSERT INTO TD_users (username, nama, dept, password) VALUES (@username, @name, @dept, @pass)');
+
+      return {
+        NIK: nrp,
+        Nama: name,
+        Departemen: dept,
+        Jabatan: dept.toLowerCase().includes('it') ? 'IT Support' : 'Employee',
+        Email: `${nrp.toLowerCase()}@voksel.co.id`,
+        Status: 'Active'
+      };
+    } catch (err: any) {
+      console.error('[Database] Failed to register employee:', err.message);
+      throw err;
+    }
+  }
+
+  // --- Fetch User Profile by Username from SmartIT_AI ---
+  public async getUserByUsername(username: string): Promise<Karyawan | null> {
+    const pool = getHistoryDbPool();
     if (pool) {
       try {
-        console.log(`[Database Bridge] Verifying employee credentials in database for Nrp: ${nrp}`);
         const res = await pool.request()
-          .input('nrp', mssql.VarChar(50), nrp)
-          .query('SELECT Nrp, Name, Dept, status, Pass FROM TD_karyawan WHERE Nrp = @nrp');
-
+          .input('username', mssql.VarChar(50), username)
+          .query('SELECT username, nama, dept FROM TD_users WHERE username = @username');
         if (res.recordset && res.recordset.length > 0) {
           const row = res.recordset[0];
-          const dbPass = row.Pass ? row.Pass.trim() : '';
-
-          let isMatch = false;
-          let needsMigration = false;
-
-          // 1. Verify password using bcrypt compare
-          try {
-            const { comparePassword } = require('../utils/auth');
-            isMatch = await comparePassword(pass, dbPass);
-          } catch (bcryptErr) {
-            console.warn('[Database] Bcrypt comparison failed, falling back to plain text check:', bcryptErr);
-          }
-
-          // 2. Fallback check for legacy plain text passwords (Lazy migration check)
-          if (!isMatch && dbPass === pass) {
-            isMatch = true;
-            needsMigration = true;
-          }
-
-          if (isMatch) {
-            // Lazy migration: if password matched plain text, or isn't formatted as bcrypt, write hash back
-            if (needsMigration || !dbPass.startsWith('$2b$')) {
-              try {
-                const { hashPassword } = require('../utils/auth');
-                const hashedPass = await hashPassword(pass);
-                console.log(`[Database Bridge] Lazy migrating password to Bcrypt hash for user: ${nrp}`);
-                await pool.request()
-                  .input('nrp', mssql.VarChar(50), nrp)
-                  .input('hashedPass', mssql.VarChar(100), hashedPass)
-                  .query('UPDATE TD_karyawan SET Pass = @hashedPass WHERE Nrp = @nrp');
-              } catch (migrateErr: any) {
-                console.error('[Database] Failed to lazy migrate employee password:', migrateErr.message);
-              }
-            }
-
-            return {
-              NIK: row.Nrp ? row.Nrp.trim() : '',
-              Nama: row.Name ? row.Name.trim() : '',
-              Departemen: row.Dept ? row.Dept.trim() : '',
-              Jabatan: row.Dept && row.Dept.toLowerCase().includes('it') ? 'IT Support' : 'Employee',
-              Email: row.Nrp ? `${row.Nrp.trim().toLowerCase()}@voksel.co.id` : '',
-              Status: row.status ? row.status.trim() : 'Active'
-            };
-          }
+          return {
+            NIK: row.username ? row.username.trim() : '',
+            Nama: row.nama ? row.nama.trim() : '',
+            Departemen: row.dept ? row.dept.trim() : '',
+            Jabatan: row.dept && row.dept.toLowerCase().includes('it') ? 'IT Support' : 'Employee',
+            Email: row.username ? `${row.username.trim().toLowerCase()}@voksel.co.id` : '',
+            Status: 'Active'
+          };
         }
       } catch (err: any) {
-        console.error('[Database] Failed to verify employee login:', err.message);
+        console.error('[Database] Failed to get user by username:', err.message);
       }
     }
     return null;
+  }
+
+  // --- Hapus Akun User dari SmartIT_AI ---
+  public async deleteUserByUsername(username: string): Promise<void> {
+    const pool = getHistoryDbPool();
+    if (pool) {
+      try {
+        console.log(`[Database Bridge] Menghapus user ${username} dari tabel TD_users`);
+        await pool.request()
+          .input('username', mssql.VarChar(50), username)
+          .query('DELETE FROM TD_users WHERE username = @username');
+      } catch (err: any) {
+        console.error('[Database] Gagal menghapus user dari database:', err.message);
+        throw err;
+      }
+    }
   }
 
   // --- Dashboard Stats Compilation ---

@@ -1,8 +1,56 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Database, HardDrive, HelpCircle } from 'lucide-react';
 import { Message } from '../../types/chat';
 import ChatBubble from './ChatBubble';
+
+const ALL_SUGGESTIONS = [
+  {
+    title: "Tampilkan tiket IT yang statusnya Open",
+    subtitle: "Melihat tiket yang belum terselesaikan",
+    command: "Tampilkan tiket IT yang statusnya Open"
+  },
+  {
+    title: "Berapa banyak komputer yang aktif?",
+    subtitle: "Melihat jumlah aset komputer aktif",
+    command: "Berapa banyak komputer yang berstatus aktif saat ini?"
+  },
+  {
+    title: "Tampilkan daftar divisi di perusahaan",
+    subtitle: "Melihat daftar divisi unik karyawan",
+    command: "Tampilkan semua departemen unik pada tabel TD_karyawan"
+  },
+  {
+    title: "Tampilkan komputer dengan merk Lenovo",
+    subtitle: "Pencarian spesifik merk CPU",
+    command: "Tampilkan komputer yang memiliki CPU_Merk 'Lenovo'"
+  },
+  {
+    title: "Tampilkan tiket IT dari departemen GA",
+    subtitle: "Melihat keluhan dari divisi General Affairs",
+    command: "Tampilkan tiket IT yang diajukan oleh departemen GA"
+  },
+  {
+    title: "Apa fungsi divisi HRD?",
+    subtitle: "Informasi mengenai divisi Human Resources",
+    command: "Apa fungsi utama divisi HRD di dalam perusahaan?"
+  },
+  {
+    title: "Tampilkan data komputer jenis LAPTOP",
+    subtitle: "Mencari komputer bertipe laptop",
+    command: "Tampilkan data komputer yang memiliki tipe LAPTOP"
+  },
+  {
+    title: "Tampilkan tiket IT yang belum diproses",
+    subtitle: "Mencari tiket IT tanpa NoWO",
+    command: "Tampilkan tiket IT yang kolom NoWO-nya kosong"
+  },
+  {
+    title: "Tampilkan rincian tindakan perbaikan",
+    subtitle: "Melihat tindakan perbaikan pada TD_WO",
+    command: "Tampilkan rincian tindakan perbaikan (DeskripsiTindakan) pada tabel TD_WO"
+  }
+];
 
 interface SuggestionChipProps {
   title: string;
@@ -86,6 +134,12 @@ export default function ChatWindow({
   messagesEndRef,
 }: ChatWindowProps) {
   const isDark = theme === 'dark';
+  const [randomSuggestions, setRandomSuggestions] = useState<typeof ALL_SUGGESTIONS>([]);
+
+  useEffect(() => {
+    const shuffled = [...ALL_SUGGESTIONS].sort(() => 0.5 - Math.random());
+    setRandomSuggestions(shuffled.slice(0, 4));
+  }, []);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar">
@@ -116,30 +170,15 @@ export default function ChatWindow({
 
           {/* Suggestion Chips */}
           <div className="grid gap-3 sm:grid-cols-2 text-left">
-            <SuggestionChip 
-              title="Lihat semua tiket IT yang belum memiliki Work Order" 
-              subtitle="Kolom NoWO kosong pada TD_TICKET"
-              onClick={() => onSendMessage("Tampilkan tiket IT yang kolom NoWO-nya kosong (belum diproses)")}
-              theme={theme}
-            />
-            <SuggestionChip 
-              title="Berapa banyak komputer Lenovo yang aktif?" 
-              subtitle="Pencarian CPU_Merk 'Lenovo' & Aktif = 'Y'"
-              onClick={() => onSendMessage("Hitung jumlah komputer dengan CPU_Merk 'Lenovo' yang statusnya Aktif = 'Y'")}
-              theme={theme}
-            />
-            <SuggestionChip 
-              title="Cari karyawan bernama Ahmad" 
-              subtitle="Pencarian kolom Name pada TD_karyawan"
-              onClick={() => onSendMessage("Cari karyawan yang memiliki nama mengandung kata 'Ahmad'")}
-              theme={theme}
-            />
-            <SuggestionChip 
-              title="Tampilkan tindakan WO yang dikerjakan Gohan" 
-              subtitle="Pencarian DeskripsiTindakan & ITPic pada TD_WO"
-              onClick={() => onSendMessage("Tampilkan rincian tindakan perbaikan (DeskripsiTindakan) pada tabel TD_WO yang ditugaskan ke PIC 'Gohan Ambarita'")}
-              theme={theme}
-            />
+            {randomSuggestions.map((s, idx) => (
+              <SuggestionChip 
+                key={idx}
+                title={s.title} 
+                subtitle={s.subtitle}
+                onClick={() => onSendMessage(s.command)}
+                theme={theme}
+              />
+            ))}
           </div>
 
 

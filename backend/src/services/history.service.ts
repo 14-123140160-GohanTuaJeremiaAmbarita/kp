@@ -4,8 +4,8 @@ import { Conversation, Message, Memory, Feedback } from '../types/history';
 export class HistoryService {
   private historyRepo = new HistoryRepository();
 
-  public async getConversations(): Promise<Conversation[]> {
-    return await this.historyRepo.getConversations();
+  public async getConversations(userNik?: string): Promise<Conversation[]> {
+    return await this.historyRepo.getConversations(userNik);
   }
 
   public async getConversation(id: string): Promise<Conversation | undefined> {
@@ -40,8 +40,8 @@ export class HistoryService {
   }
 
   // Memories
-  public async getMemoriesForUser(conversationId?: string): Promise<Memory[]> {
-    return await this.historyRepo.getMemories(conversationId);
+  public async getMemoriesForUser(conversationId?: string, userNik?: string): Promise<Memory[]> {
+    return await this.historyRepo.getMemories(conversationId, userNik);
   }
 
   public async createMemory(factText: string, userNIK: string = 'VOK001', conversationId?: string): Promise<Memory> {

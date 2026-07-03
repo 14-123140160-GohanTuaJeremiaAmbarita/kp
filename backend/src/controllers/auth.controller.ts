@@ -5,6 +5,25 @@ import { generateToken } from '../utils/auth';
 export class AuthController {
   private employeeService = new EmployeeService();
 
+  public register = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { username, nama, departemen, sandi } = req.body;
+      if (!username || !nama || !departemen || !sandi) {
+        return res.status(400).json({ success: false, error: 'Semua kolom input wajib diisi.' });
+      }
+
+      const newEmployee = await this.employeeService.register(username, nama, departemen, sandi);
+      
+      res.json({
+        success: true,
+        message: 'Pendaftaran karyawan baru berhasil.',
+        user: newEmployee
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message || 'Gagal mendaftar.' });
+    }
+  };
+
   public login = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { nik, password } = req.body;
@@ -50,6 +69,30 @@ export class AuthController {
       });
     } catch (error) {
       next(error);
+    }
+  };
+
+  public deleteUser = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const { username } = req.params;
+      const user = (req as any).user;
+
+      if (user?.Role !== 'IT Support') {
+        return res.status(403).json({ success: false, error: 'Akses ditolak: Hanya IT Support yang dapat menghapus akun.' });
+      }
+
+      if (username === 'admin' || username === 'VOK001') {
+        return res.status(400).json({ success: false, error: 'Akun administrator bawaan tidak dapat dihapus.' });
+      }
+
+      await this.employeeService.deleteUser(username as string);
+
+      res.json({
+        success: true,
+        message: `Akun dengan username "${username}" berhasil dihapus.`
+      });
+    } catch (error: any) {
+      res.status(400).json({ success: false, error: error.message || 'Gagal menghapus user.' });
     }
   };
 }

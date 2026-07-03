@@ -5,8 +5,8 @@ export class HistoryRepository {
   private db = getHistoryDbInstance();
 
   // Conversations
-  public async getConversations(): Promise<Conversation[]> {
-    return await this.db.getConversations();
+  public async getConversations(userNik?: string): Promise<Conversation[]> {
+    return await this.db.getConversations(userNik);
   }
 
   public async getConversationById(id: string): Promise<Conversation | undefined> {
@@ -62,8 +62,8 @@ export class HistoryRepository {
   }
 
   // AI Memories
-  public async getMemories(conversationId?: string): Promise<Memory[]> {
-    return await this.db.getMemories(conversationId);
+  public async getMemories(conversationId?: string, userNik?: string): Promise<Memory[]> {
+    return await this.db.getMemories(conversationId, userNik);
   }
 
   public async addMemory(factText: string, userNIK: string = 'VOK001', conversationId?: string): Promise<Memory> {
