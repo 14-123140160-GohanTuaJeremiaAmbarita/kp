@@ -96,7 +96,7 @@ Kalimat pengguna: "${messageText}"`;
     let sqlErrorFromGen: string | undefined;
     if (!sqlQuery) {
       try {
-        const sqlRes = await this.sqlService.generateSql(messageText, memoryContext, historyContext);
+        const sqlRes = await this.sqlService.generateSql(messageText, memoryContext, historyContext, model);
         if (sqlRes.requiresQuery && sqlRes.sql) {
           sqlQuery = sqlRes.sql;
         }
@@ -128,17 +128,28 @@ Kamu akan diberikan pesan pengguna, kueri SQL yang dijalankan (jika ada), hasil 
 
 Tugas kamu:
 - Berikan balasan dalam bahasa Indonesia yang ringkas, elegan, dan profesional.
-- Rangkum data yang didapat dari database agar mudah dibaca oleh manusia. Format dalam tabel Markdown atau poin list yang teratur dan rapi.
+- Rangkum data yang didapat dari database agar mudah dibaca oleh manusia. JANGAN menulis seluruh data dalam bentuk tabel Markdown yang sangat besar jika baris data melebihi 15 baris. Tampilkan maksimal 10-15 baris contoh saja sebagai preview di tabel Markdown, lalu tambahkan catatan bahwa "Tabel lengkap berisi [X] baris data dapat Anda lihat pada bagian 'Lihat Kueri SQL' di bawah dan siap diunduh dalam format Excel atau PDF."
 - Beritahu pengguna secara implisit/eksplisit jika data berhasil diambil dari database produksi ITOpr (Readonly) secara langsung.
-- JANGAN menyebutkan hal teknis seperti "JSON string", "Express server", "mock data" atau "simulated database". Bicaralah seolah-olah kamu tersambung ke sistem SAP / IT Operations utama PT Voksel Electric Tbk.
+- JANGAN menyebutkan hal teknis seperti "JSON string", "Express server", "mock data" or "simulated database". Bicaralah seolah-olah kamu tersambung ke sistem SAP / IT Operations utama PT Voksel Electric Tbk.
 - Jika pengguna meminta untuk mengunduh/mengekspor data dan kueri SQL sebelumnya berhasil ditemukan, beritahu pengguna bahwa data siap diunduh dalam format Microsoft Excel atau dokumen PDF menggunakan tombol unduh yang telah disediakan di bawah gelembung obrolan ini.
 - Jika ada kesalahan SQL (sqlError), beritahu pengguna dengan sopan bahwa kueri ditolak oleh lapisan keamanan database (SQL Security Layer) atau ada kesalahan sintaks, lalu tawarkan solusi.
 `;
 
+    let sqlResultPreview = 'Tidak ada hasil';
+    if (sqlResult && Array.isArray(sqlResult)) {
+      sqlResultPreview = JSON.stringify({
+        totalRowsCount: sqlResult.length,
+        note: "Ini adalah 15 baris pertama saja untuk contoh ringkasan. Sisanya ditampilkan di UI table di luar AI response.",
+        rowsPreview: sqlResult.slice(0, 15)
+      });
+    } else if (sqlResult) {
+      sqlResultPreview = JSON.stringify(sqlResult);
+    }
+
     const summaryPrompt = `
 Kalimat Pengguna: "${messageText}"
 Kueri SQL yang dijalankan: ${sqlQuery || 'Tidak ada kueri SQL'}
-Hasil Eksekusi Database: ${sqlResult ? JSON.stringify(sqlResult) : 'Tidak ada hasil'}
+Hasil Eksekusi Database (Preview): ${sqlResultPreview}
 Kesalahan Database (jika ada): ${sqlError || 'Tidak ada kesalahan'}
 Informasi AI Memory:
 ${memoryContext}
@@ -147,7 +158,7 @@ Tulis tanggapan akhir yang profesional dan informatif dalam Bahasa Indonesia.`;
 
     let finalAnswer = 'Maaf, saya tidak dapat merumuskan tanggapan saat ini.';
     try {
-      finalAnswer = await this.openRouter.generateContent(summaryPrompt, summarizationSystem);
+      finalAnswer = await this.openRouter.generateContent(summaryPrompt, summarizationSystem, false, model);
     } catch (err: any) {
       console.error('Error generating response summary:', err);
       finalAnswer = `Maaf, terjadi kesalahan saat merumuskan tanggapan: ${err.message}`;

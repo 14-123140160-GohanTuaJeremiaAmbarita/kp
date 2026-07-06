@@ -12,14 +12,20 @@ Database ini memiliki skema berikut:
    - Pass (VARCHAR) - Sandi login (kolom sensitif, jangan ditunjukkan ke pengguna)
 
 2. **TD_computer** (Data Aset Komputer Karyawan)
-   - CodeCpu (VARCHAR, Primary Key) - Kode aset komputer / CPU. Contoh: 'COM-001'
+   - CodeCpu (VARCHAR, Primary Key) - Kode aset komputer / CPU. Contoh: 'C1513', 'C2306'
    - Nrp (VARCHAR, Foreign Key -> TD_karyawan.Nrp) - Nrp pengguna komputer
    - CPU_Merk (VARCHAR) - Merek komputer ('Lenovo', 'Dell', 'HP', 'ASUS')
-   - CPU_Type (VARCHAR) - Seri / model komputer (misal 'ThinkPad T14', 'Latitude 5420')
+   - CPU_Type (VARCHAR) - Seri / model komputer (misal 'ThinkBook 14 G2', 'Lenovo G40')
    - OS (VARCHAR) - Sistem Operasi ('Windows 10 Pro', 'Windows 11 Pro', 'Linux', dll)
    - Aktif (VARCHAR) - Status keaktifan aset komputer ('Y' jika Aktif/aktif digunakan, 'T' jika Tidak aktif)
    - UserNama (VARCHAR) - Nama pengguna komputer
    - Dept (VARCHAR) - Departemen pengguna komputer
+   - CPU_RcptDate (DATETIME) - Tanggal Penerimaan Komputer (Receipt Date) oleh Karyawan. Gunakan kolom ini untuk filter berdasarkan tahun/waktu/tanggal penerimaan komputer terbaru atau X tahun terakhir (contoh: CPU_RcptDate >= DATEADD(year, -5, GETDATE())).
+   - CPU_SerialNo (VARCHAR) - Nomor Seri / Serial Number laptop.
+   - Keterangan (VARCHAR) - Keterangan/keterangan kondisi atau alokasi.
+   - Processor (VARCHAR) - Jenis Processor (misal 'Intel Core i5')
+   - Hardisk (VARCHAR) - Jenis & kapasitas penyimpanan (misal 'SSD 512GB')
+   - Memory (VARCHAR) - Kapasitas RAM (misal '16GB RAM')
 
 3. **TD_TICKET** (Data Tiket Masalah IT)
    - NRP (VARCHAR, Foreign Key -> TD_karyawan.Nrp) - NRP pelapor masalah IT
@@ -30,18 +36,25 @@ Database ini memiliki skema berikut:
    - tglupdate (SMALLDATETIME) - Tanggal update terakhir tiket
 
 4. **TD_WO** (Data Work Order IT untuk penanganan tiket)
-   - NoWO (VARCHAR, Primary Key) - Nomor Work Order
+   - NoWO (VARCHAR, Primary Key) - Nomor Work Order. Contoh: '1312-001'
    - Date (DATETIME) - Tanggal Work Order dibuat
    - Dept (VARCHAR) - Departemen terkait
-   - Type (VARCHAR) - Tipe WO
-   - JenisWO (VARCHAR) - Jenis WO
-   - SubType (VARCHAR) - Sub-tipe WO
-   - Content (VARCHAR) - Detail masalah / tugas
-   - Uraiankerusakan (VARCHAR) - Deskripsi kerusakan
-   - DeskripsiTindakan (VARCHAR) - Deskripsi tindakan pemecahan masalah / penyelesaian oleh teknisi
-   - ITPic (VARCHAR) - Nama PIC IT / Teknisi yang ditugaskan (contoh 'Fajar Prasetyo', 'Gohan Ambarita')
+   - Type (VARCHAR) - Tipe WO (contoh: 'Infrastruktur')
+   - JenisWO (VARCHAR) - Jenis WO (contoh: 'Perbaikan')
+   - SubType (VARCHAR) - Sub-tipe WO (contoh: 'Monitor', 'hardware')
+   - NoIdentification (VARCHAR) - Kode aset komputer (CodeCpu) milik TD_computer. Hubungkan TD_WO.NoIdentification = TD_computer.CodeCpu saat JOIN!
+   - Content (VARCHAR) - Jenis perangkat (contoh: 'PC', 'Monitor')
+   - Uraiankerusakan (VARCHAR) - Deskripsi/uraian kerusakan
+   - UserC (VARCHAR) - NRP Karyawan pelapor
+   - MulaiPengerjaan (DATETIME) - Waktu mulai pengerjaan oleh teknisi
+   - SelesaiPengarjaan (DATETIME) - Waktu selesai pengerjaan oleh teknisi
+   - TotalDowntime (INT) - Total downtime penanganan (dalam menit)
+   - DeskripsiTindakan (VARCHAR) - Tindakan pemecahan masalah/penyelesaian oleh teknisi
+   - TingkatKesulitan (VARCHAR) - Tingkat kesulitan ('Mudah', 'Sedang', 'Sulit')
    - Closed (SMALLINT) - Status penanganan (1 untuk Selesai / Closed, 0 untuk Belum Selesai / Open / In Progress)
-   - SelesaiPengarjaan (DATETIME) - Tanggal selesai pengerjaan
+   - ITPic (VARCHAR) - Nama PIC IT / Teknisi yang ditugaskan (contoh 'Fajar Prasetyo', 'SENDY', 'FUTTUH')
+   - Penyebab (VARCHAR) - Penyebab masalah (contoh: 'Perangkat', 'User')
+   - Name (VARCHAR) - Nama karyawan pelapor
 
 5. **TD_MEMORY** (Data Memori AI / Fakta Personal yang Disimpan secara SQL)
    - MemoryID (VARCHAR, Primary Key) - Contoh: 'MEM-001'

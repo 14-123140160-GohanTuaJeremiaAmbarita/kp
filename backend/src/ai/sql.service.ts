@@ -11,7 +11,8 @@ export class SqlService {
   public async generateSql(
     messageText: string,
     memoryContext: string,
-    historyContext: string
+    historyContext: string,
+    model?: string
   ): Promise<SqlQueryResponse> {
     const schemaInstruction = this.schema.getSystemSchemaInstruction();
 
@@ -27,7 +28,7 @@ Pesan Pengguna Sekarang: "${messageText}"
 Format keluaran Anda harus berupa objek JSON murni tanpa hiasan markdown atau pembungkus lain (hanya objek JSON).`;
 
     try {
-      const responseText = await this.openRouter.generateContent(prompt, schemaInstruction, true);
+      const responseText = await this.openRouter.generateContent(prompt, schemaInstruction, true, model);
       const parsed: SqlQueryResponse | null = this.openRouter.tryParseAiJson(responseText);
 
       if (!parsed) {

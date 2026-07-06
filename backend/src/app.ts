@@ -1,4 +1,6 @@
 import express from 'express';
+import path from 'path';
+import cors from 'cors';
 import { errorMiddleware } from './middlewares/error.middleware';
 
 // Import Routes
@@ -14,6 +16,7 @@ import historyRoutes from './routes/history.routes';
 
 const app = express();
 
+app.use(cors());
 app.use(express.json());
 
 // Health Check
@@ -33,6 +36,22 @@ app.use('/api/export', exportRoutes);
 // Register Conversation, AI Memory, and Chatbot pipeline routes under '/api'
 app.use('/api', chatbotRoutes); // Handles /api/chat, /api/feedback
 app.use('/api', historyRoutes); // Handles /api/conversations, /api/memories
+
+// Serve static assets from frontend/dist in production
+const frontendDistPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendDistPath));
+
+// Fallback to index.html for React Router (Single Page Application)
+app.get('/*splat', (req, res, next) => {
+  if (req.path.startsWith('/api')) {
+    return next();
+  }
+  res.sendFile(path.join(frontendDistPath, 'index.html'), (err) => {
+    if (err) {
+      res.status(404).send('Frontend build not found. Please run "npm run build" in the frontend directory first.');
+    }
+  });
+});
 
 // Error Handler Middleware
 app.use(errorMiddleware);

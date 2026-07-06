@@ -102,7 +102,8 @@ export default function Home({ user, onLogout }: HomeProps) {
   }, [messages]);
 
   // Document PDF exporter
-  const handleExportPDF = (sql: string, jsonResult: string) => {
+  // Document PDF exporter
+  const handleExportPDF = (sql: string, jsonResult: string, queryPrompt?: string) => {
     try {
       const data = JSON.parse(jsonResult);
       if (!Array.isArray(data) || data.length === 0) {
@@ -110,33 +111,125 @@ export default function Home({ user, onLogout }: HomeProps) {
         return;
       }
 
-      const doc = new jsPDF();
+      // Determine report title
+      let reportTitle = 'LAPORAN OPERASIONAL IT';
+      if (queryPrompt) {
+        let clean = queryPrompt.trim();
+        // Remove common prefix words
+        clean = clean.replace(/^(tampilkan data|tampilkan|cari data|cari|minta data|minta|tolong tampilkan|tolong|lihat data|lihat)\s+/i, '');
+        // Capitalize first letter of each word
+        reportTitle = clean.split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ').toUpperCase();
+      } else {
+        const tableMatch = sql.match(/from\s+([a-z0-9_]+)/i);
+        const tableName = tableMatch ? tableMatch[1].toLowerCase() : '';
+        let baseTitle = 'Laporan Operasional IT';
+        if (tableName === 'td_computer') baseTitle = 'Data Aset Komputer';
+        else if (tableName === 'td_karyawan') baseTitle = 'Data Karyawan';
+        else if (tableName === 'td_ticket') baseTitle = 'Data Tiket Masalah IT';
+        else if (tableName === 'td_wo') baseTitle = 'Data Work Order IT';
+        
+        // Try to parse simple filters
+        const filterMatch = sql.match(/where\s+([a-z0-9_]+)\s*=\s*'([^']+)'/i);
+        if (filterMatch) {
+          const val = filterMatch[2];
+          baseTitle += ` - ${val}`;
+        }
+        reportTitle = baseTitle.toUpperCase();
+      }
+
+      // Use landscape A4 (297mm x 210mm) for wider layout compatibility
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
       
-      // Title
+      // Title Block
       doc.setFontSize(16);
       doc.setTextColor(15, 23, 42); // slate-900
-      doc.text("PT VOKSEL ELECTRIC TBK", 14, 20);
+      doc.text("PT VOKSEL ELECTRIC TBK", 14, 18);
       
-      doc.setFontSize(10);
+      doc.setFontSize(11);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(37, 99, 235); // blue-600
+      doc.text(reportTitle, 14, 24);
+      
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(9);
       doc.setTextColor(100, 116, 139); // slate-500
-      doc.text("Smart IT Assistant - Laporan Ekspor Operasional IT", 14, 26);
-      doc.text(`Kueri: ${sql.length > 80 ? sql.substring(0, 77) + '...' : sql}`, 14, 31);
-      doc.text(`Tanggal Ekspor: ${new Date().toLocaleString('id-ID')}`, 14, 36);
+      doc.text(`Tanggal Ekspor: ${new Date().toLocaleString('id-ID')}`, 14, 29);
       
-      // Divider
+      // Divider (297mm width, left margin 14, right margin 14 -> line ends at 283mm)
       doc.setDrawColor(226, 232, 240);
-      doc.line(14, 40, 196, 40);
+      doc.line(14, 33, 283, 33);
       
-      const headers = Object.keys(data[0]);
-      const rows = data.map(row => headers.map(h => String(row[h] ?? 'NULL')));
+      // Column prioritization scoring function
+      const getColumnPriority = (colName: string): number => {
+        const name = colName.toLowerCase();
+        
+        // High exclusion list (always exclude these technical/sensitive/long columns)
+        const excludeList = [
+          'pass', 'password', 'ossernbr', 'msoffice', 'internet', 'codemtr', 'codeprn', 'codeprn2', 
+          'lpbnbr', 'mac_address', 'mac_addresswan', 'noip', 'noip1', 'writeoffdate', 'departement', 
+          'lampiran', 'perusahaan', 'tanggalresign', 'far_code', 'cpusuplier', 'cpu_suplier', 'drive'
+        ];
+        if (excludeList.includes(name)) return -100; // never show
+
+        // Priority 10: Primary IDs
+        if (['codecpu', 'nowo', 'ticketid', 'id', 'noticket', 'no_wo', 'no_ticket', 'memoryid'].includes(name)) return 10;
+        
+        // Priority 9: People Names and identifiers
+        if (['nrp', 'name', 'nama', 'username', 'usernama', 'userc', 'itpic'].includes(name)) return 9;
+        
+        // Priority 8: Main descriptors / status / dates
+        if (['jenis', 'cpu_merk', 'cpu_type', 'brand', 'model', 'problem', 'closed', 'status', 'date', 'tgl'].includes(name)) return 8;
+        
+        // Priority 7: Important details / specs
+        if (['processor', 'hardisk', 'memory', 'ram', 'os', 'aktif', 'dept', 'type', 'jeniswo', 'subtype', 'content', 'penyebab'].includes(name)) return 7;
+        
+        // Priority 6: Dates and times / numeric
+        if (['cpu_rcptdate', 'cpu_rcpdate', 'tglupdate', 'mulaipengerjaan', 'selesaipengerjaan', 'totaldowntime', 'tingkatkesulitan', 'cpu_serialno', 'serialno'].includes(name)) return 6;
+        
+        // Priority 5: Descriptions, remarks, texts
+        if (['keterangan', 'remark', 'uraiankerusakan', 'deskripsitindakan', 'facttext', 'createddate', 'check_list'].includes(name)) return 5;
+        
+        // Priority 1: Other details / low priority lists
+        if (['softwareothers', 'email_internal', 'email_voksel_coid', 'email_voksel_com'].includes(name)) return 1;
+
+        return 4; // default priority
+      };
+
+      let headers = Object.keys(data[0]);
+      
+      // Filter out permanently excluded columns
+      headers = headers.filter(h => getColumnPriority(h) >= 0);
+      
+      if (headers.length > 8) {
+        const sortedByPriority = [...headers].sort((a, b) => getColumnPriority(b) - getColumnPriority(a));
+        const top8 = sortedByPriority.slice(0, 8);
+        // Keep the original order of the top 8 columns
+        headers = headers.filter(h => top8.includes(h));
+      }
+      
+      const rows = data.map(row => headers.map(h => {
+        const val = row[h];
+        if (val instanceof Date) return val.toLocaleDateString('id-ID');
+        // Format ISO dates to readable local dates
+        if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(val)) {
+          return new Date(val).toLocaleDateString('id-ID');
+        }
+        return String(val ?? 'NULL');
+      }));
+
+      const startY = 38;
+
+      // Dynamically adjust font size based on column count (though capped at 8 columns)
+      const fontSize = headers.length > 8 ? 7 : 8;
 
       autoTable(doc, {
-        startY: 44,
+        startY: startY,
         head: [headers],
         body: rows,
         theme: 'striped',
         headStyles: { fillColor: [37, 99, 235] }, // blue-600
-        styles: { fontSize: 8, font: 'helvetica' }
+        styles: { fontSize: fontSize, font: 'helvetica', overflow: 'linebreak' },
+        margin: { left: 14, right: 14 }
       });
 
       doc.save(`voksel_it_export_${Date.now()}.pdf`);

@@ -1,4 +1,4 @@
-import app from '../src/app';
+import app from './app';
 import path from 'path';
 import { connectDatabase } from './config/database';
 
@@ -32,7 +32,7 @@ async function startServer() {
   console.log("=========================================");
   console.log("Backend Ready");
 
-  app.listen(Number(PORT), '0.0.0.0', () => {
+  app.listen(Number(PORT), () => {
     // Already printed above
   });
 }

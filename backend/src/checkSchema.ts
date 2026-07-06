@@ -1,7 +1,7 @@
 import mssql from 'mssql';
-import dotenv from 'dotenv';
+import { loadEnv } from './utils/env';
 
-dotenv.config();
+loadEnv();
 
 const companyConfig: mssql.config = {
   server: process.env.DB_SERVER || '192.168.9.14',

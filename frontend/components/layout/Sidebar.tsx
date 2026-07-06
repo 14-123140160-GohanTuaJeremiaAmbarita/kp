@@ -6,6 +6,7 @@ import HistorySidebar from './HistorySidebar';
 
 interface SidebarProps {
   isSidebarOpen: boolean;
+  setIsSidebarOpen?: (val: boolean) => void;
   conversations: Conversation[];
   activeConvId: string;
   setActiveConvId: (id: string) => void;
@@ -18,6 +19,7 @@ interface SidebarProps {
 
 export default function Sidebar({
   isSidebarOpen,
+  setIsSidebarOpen,
   conversations,
   activeConvId,
   setActiveConvId,
@@ -44,7 +46,7 @@ export default function Sidebar({
           animate={{ width: 260, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-          className="w-64 bg-[#0a1e3b] text-slate-300 flex h-full flex-col border-r border-slate-850 shadow-xl shrink-0 animate-fade"
+          className="w-64 bg-[#0a1e3b] text-slate-300 flex h-full flex-col border-r border-slate-850 shadow-xl shrink-0 animate-fade absolute md:static z-50 left-0 top-0"
         >
           {/* Header Voksel Blue */}
           <div className="p-4 border-b border-slate-750/50 flex items-center gap-3 shrink-0 bg-slate-950/25">
@@ -61,7 +63,12 @@ export default function Sidebar({
           <HistorySidebar
             conversations={conversations}
             activeConvId={activeConvId}
-            setActiveConvId={setActiveConvId}
+            setActiveConvId={(id) => {
+              setActiveConvId(id);
+              if (window.innerWidth < 768 && setIsSidebarOpen) {
+                setIsSidebarOpen(false);
+              }
+            }}
             onDeleteConversation={onDeleteConversation}
             onPinConversation={onPinConversation}
           />
@@ -74,7 +81,12 @@ export default function Sidebar({
             
             <button 
               id="btn-new-chat"
-              onClick={onCreateConversation}
+              onClick={() => {
+                onCreateConversation();
+                if (window.innerWidth < 768 && setIsSidebarOpen) {
+                  setIsSidebarOpen(false);
+                }
+              }}
               className="w-full bg-blue-600 hover:bg-blue-500 py-2 rounded-md text-center text-xs font-bold text-white cursor-pointer transition-all shadow-lg block focus:outline-none"
             >
               + Percakapan Baru

@@ -33,14 +33,14 @@ export default function MarkdownMessage({ content, theme }: MarkdownMessageProps
           h2: ({ children }) => <h2 className="text-sm font-bold mt-2 mb-1">{children}</h2>,
           h3: ({ children }) => <h3 className="text-xs font-bold mt-1.5 mb-1">{children}</h3>,
           table: ({ children }) => (
-            <div className="overflow-x-auto my-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-sm">
+            <div className="overflow-x-auto my-3.5 rounded-xl border border-slate-200 dark:border-slate-800/80 shadow-sm bg-transparent">
               <table className="min-w-full divide-y divide-slate-200 dark:divide-slate-800/80 text-left text-xs">
                 {children}
               </table>
             </div>
           ),
           thead: ({ children }) => (
-            <thead className={`${isDark ? 'bg-slate-850/80 text-slate-300' : 'bg-slate-50 text-slate-600'} font-bold`}>
+            <thead className={`${isDark ? 'bg-slate-800/80 text-slate-300' : 'bg-slate-50 text-slate-600'} font-bold`}>
               {children}
             </thead>
           ),
@@ -60,7 +60,7 @@ export default function MarkdownMessage({ content, theme }: MarkdownMessageProps
             </th>
           ),
           td: ({ children }) => (
-            <td className="px-4 py-2 text-slate-700 dark:text-slate-350">
+            <td className="px-4 py-2 text-slate-750 dark:text-slate-200">
               {children}
             </td>
           ),
@@ -71,3 +71,4 @@ export default function MarkdownMessage({ content, theme }: MarkdownMessageProps
     </div>
   );
 }
+

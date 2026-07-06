@@ -1,6 +1,6 @@
 import mssql from 'mssql';
 import { v4 as uuidv4 } from 'uuid';
-import dotenv from 'dotenv';
+import { loadEnv } from '../utils/env';
 import { Karyawan } from '../types/employee';
 import { Computer } from '../types/computer';
 import { Ticket } from '../types/ticket';
@@ -8,7 +8,7 @@ import { WorkOrder } from '../types/workorder';
 import { Conversation, Message, Feedback, Memory } from '../types/history';
 import { DashboardStats } from '../types/chatPipeline';
 
-dotenv.config();
+loadEnv();
 
 const companyConfig: mssql.config = {
   server: process.env.DB_SERVER || '192.168.9.14',

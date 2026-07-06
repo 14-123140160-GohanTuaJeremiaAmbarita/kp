@@ -16,7 +16,7 @@ interface ChatBubbleProps {
   onFeedback: (msgId: string, score: number, question: string, sqlQuery: string, answerText: string) => void;
   userQuestion: string;
   onExportExcel: (sql: string) => void;
-  onExportPDF: (sql: string, result: string) => void;
+  onExportPDF: (sql: string, result: string, userQuestion?: string) => void;
 }
 
 export default function ChatBubble({
@@ -154,6 +154,7 @@ export default function ChatBubble({
                 sqlResult={message.SqlResult}
                 onExportExcel={onExportExcel}
                 onExportPDF={onExportPDF}
+                userQuestion={userQuestion}
                 theme={theme}
               />
             )}

@@ -18,7 +18,7 @@ export class ExportController {
       }
 
       const rows = execResult.data;
-      const buffer = generateExcelBuffer(rows);
+      const buffer = await generateExcelBuffer(rows);
 
       res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
       res.setHeader('Content-Disposition', `attachment; filename="smartit_export_${Date.now()}.xlsx"`);

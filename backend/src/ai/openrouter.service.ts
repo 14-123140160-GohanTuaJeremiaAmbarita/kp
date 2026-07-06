@@ -1,10 +1,10 @@
 // backend/src/ai/openrouter.service.ts
 // Versi OpenRouter dengan dukungan pemilihan model dinamis dari frontend.
 
-import dotenv from "dotenv";
+import { loadEnv } from "../utils/env";
 import { GoogleGenAI } from "@google/genai";
 
-dotenv.config();
+loadEnv();
 
 function buildRouterSystemPrompt(schemaText: string): string {
     return `
@@ -166,6 +166,7 @@ maksimal 5 poin.
 /** Daftar model yang BOLEH dipilih dari frontend — proteksi supaya user tidak bisa kirim model_id sembarangan lewat request langsung ke API. */
 const ALLOWED_MODELS = new Set([
     "deepseek/deepseek-chat",
+    "deepseek/deepseek-r1",
     "deepseek/deepseek-v4-pro",
     "openai/gpt-4o-mini",
     "openai/gpt-5",
@@ -233,13 +234,12 @@ export class OpenRouterService {
         
         // Map frontend dropdown IDs to valid OpenRouter model IDs
         if (requestedModel === 'deepseek-v4-flash') return 'deepseek/deepseek-chat';
-        if (requestedModel === 'deepseek-v4-pro') return 'deepseek/deepseek-chat'; // fallback jika v4-pro tidak aktif
+        if (requestedModel === 'deepseek-v4-pro') return 'deepseek/deepseek-r1'; 
         if (requestedModel === 'openai') return 'openai/gpt-4o-mini';
         if (requestedModel === 'claude') return 'anthropic/claude-3.5-sonnet';
         if (requestedModel === 'gemini-3.5-flash') return 'google/gemini-2.5-flash';
 
         // Keep legacy mapping
-        if (requestedModel === 'gemini-3.5-flash') return 'google/gemini-2.5-flash';
         if (requestedModel === 'deepseek-v3') return 'deepseek/deepseek-chat';
         if (requestedModel === 'gpt-4o') return 'openai/gpt-4o-mini';
 
@@ -259,6 +259,7 @@ export class OpenRouterService {
             model,
             messages,
             temperature,
+            max_tokens: 2048,
         };
 
         if (forceJson) {

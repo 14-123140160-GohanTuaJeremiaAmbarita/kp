@@ -26,7 +26,7 @@ interface LayoutProps {
   fetchStats: () => void;
   messages: Message[];
   onExportExcel: (sql: string) => void;
-  onExportPDF: (sql: string, result: string) => void;
+  onExportPDF: (sql: string, result: string, userQuestion?: string) => void;
   user: any;
   onLogout: () => void;
   children: React.ReactNode;
@@ -67,6 +67,7 @@ export default function Layout({
       {/* LEFT SIDEBAR - CHAT HISTORY GROUPED */}
       <Sidebar
         isSidebarOpen={isSidebarOpen}
+        setIsSidebarOpen={setIsSidebarOpen}
         conversations={conversations}
         activeConvId={activeConvId}
         setActiveConvId={setActiveConvId}
@@ -76,6 +77,14 @@ export default function Layout({
         user={user}
         onLogout={onLogout}
       />
+
+      {/* MOBILE SIDEBAR OVERLAY/BACKDROP */}
+      {isSidebarOpen && (
+        <div 
+          className="md:hidden fixed inset-0 bg-black/50 z-40 transition-opacity" 
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
 
       {/* CENTER WORKSPACE */}
       <div className={`flex flex-1 flex-col overflow-hidden transition-colors duration-300 ${

@@ -113,7 +113,7 @@ interface ChatWindowProps {
   feedbackStatus: Record<string, 'up' | 'down'>;
   onFeedback: (msgId: string, score: number, question: string, sqlQuery: string, answerText: string) => void;
   onExportExcel: (sql: string) => void;
-  onExportPDF: (sql: string, result: string) => void;
+  onExportPDF: (sql: string, result: string, userQuestion?: string) => void;
   messagesEndRef: React.RefObject<HTMLDivElement | null>;
 }
 

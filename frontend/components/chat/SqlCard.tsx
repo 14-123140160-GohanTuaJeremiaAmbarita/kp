@@ -7,7 +7,8 @@ interface SqlCardProps {
   sqlQuery: string;
   sqlResult?: string;
   onExportExcel: (sql: string) => void;
-  onExportPDF: (sql: string, result: string) => void;
+  onExportPDF: (sql: string, result: string, userQuestion?: string) => void;
+  userQuestion?: string;
   theme?: 'light' | 'dark';
 }
 
@@ -16,6 +17,7 @@ export default function SqlCard({
   sqlResult,
   onExportExcel,
   onExportPDF,
+  userQuestion,
   theme,
 }: SqlCardProps) {
   const isDark = theme === 'dark';
@@ -46,7 +48,7 @@ export default function SqlCard({
           </button>
           {sqlResult && (
             <button 
-              onClick={() => onExportPDF(sqlQuery, sqlResult)}
+              onClick={() => onExportPDF(sqlQuery, sqlResult, userQuestion)}
               className="flex items-center space-x-1 text-[10px] font-semibold bg-rose-600 hover:bg-rose-500 text-white px-2 py-1 rounded transition cursor-pointer"
             >
               <FileText className="h-3 w-3" />
@@ -66,7 +68,7 @@ export default function SqlCard({
       {/* Tabular SQL Results (if present) */}
       {sqlResult && (
         <div className="max-h-60 overflow-auto custom-scrollbar">
-          <DataTable jsonResult={sqlResult} />
+          <DataTable jsonResult={sqlResult} theme={theme} />
         </div>
       )}
     </motion.div>
