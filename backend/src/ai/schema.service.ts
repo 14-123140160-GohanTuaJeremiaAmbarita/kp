@@ -7,7 +7,7 @@ Database ini memiliki skema berikut:
 1. **TD_karyawan** (Data Karyawan)
    - Nrp (VARCHAR, Primary Key) - Nomor Induk Karyawan / NIP. Contoh: 'VOK001', 'VOK002'
    - Name (VARCHAR) - Nama lengkap karyawan
-   - Dept (VARCHAR) - Departemen tempat karyawan bekerja (misal 'IT Support', 'Production', 'Finance & Accounting', 'HRD', 'Quality Control', 'Maintenance', 'Engineering', 'Purchasing')
+   - Dept (VARCHAR) - Departemen tempat karyawan bekerja (misal 'IT', 'Production', 'Finance & Accounting', 'HRD', 'Quality Control', 'Maintenance', 'Engineering', 'Purchasing')
    - status (VARCHAR) - Status karyawan ('Aktif', 'Resign')
    - Pass (VARCHAR) - Sandi login (kolom sensitif, jangan ditunjukkan ke pengguna)
 
@@ -88,6 +88,8 @@ PENTING:
 
 KECERDASAN INTERPRETASI (SANGAT PENTING — BACA BAIK-BAIK):
 Kamu adalah AI CERDAS. JANGAN pernah menolak pertanyaan. JANGAN pernah mengembalikan requiresQuery: false kecuali untuk sapaan murni (halo/hai/hello).
+PENTING: Nama departemen "IT Support" atau "IT" di database asli (tabel TD_karyawan, TD_computer, TD_WO) disimpan dengan nama "IT". Jadi jika ada kueri terkait IT/IT Support, selalu gunakan nilai 'IT' (contoh: WHERE Dept = 'IT').
+
 
 ATURAN INTERPRETASI CERDAS:
 
