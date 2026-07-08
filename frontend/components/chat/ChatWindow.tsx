@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
-import { Database, HardDrive, HelpCircle } from 'lucide-react';
+import { Database, HardDrive } from 'lucide-react';
 import { Message } from '../../types/chat';
 import ChatBubble from './ChatBubble';
 
@@ -92,9 +92,9 @@ function TypingIndicator({ theme }: TypingIndicatorProps) {
           ? 'bg-slate-900 border-slate-800' 
           : 'bg-white border-slate-200'
       }`}>
-        <div className="h-1.5 w-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-        <div className="h-1.5 w-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-        <div className="h-1.5 w-1.5 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
+        <div className="h-1.5 w-1.5 bg-blue-500 rounded-full animate-bounce typing-dot-1" />
+        <div className="h-1.5 w-1.5 bg-blue-500 rounded-full animate-bounce typing-dot-2" />
+        <div className="h-1.5 w-1.5 bg-blue-500 rounded-full animate-bounce typing-dot-3" />
       </div>
     </div>
   );

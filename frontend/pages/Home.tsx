@@ -51,7 +51,7 @@ export default function Home({ user, onLogout }: HomeProps) {
   const [loading, setLoading] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
-  const [selectedModel, setSelectedModel] = useState('gemini-3.5-flash');
+  const [selectedModel, setSelectedModel] = useState('deepseek-ai/DeepSeek-V4-Flash');
 
   // Interactive UI indicators
   const [copiedId, setCopiedId] = useState('');
@@ -76,9 +76,14 @@ export default function Home({ user, onLogout }: HomeProps) {
     setToast({ message, type });
   };
 
-  // Sync theme to localStorage
+  // Sync theme to localStorage and document class
   useEffect(() => {
     localStorage.setItem('theme', theme);
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
   }, [theme]);
 
   // Initial load
@@ -101,7 +106,6 @@ export default function Home({ user, onLogout }: HomeProps) {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Document PDF exporter
   // Document PDF exporter
   const handleExportPDF = (sql: string, jsonResult: string, queryPrompt?: string) => {
     try {
@@ -318,6 +322,16 @@ export default function Home({ user, onLogout }: HomeProps) {
     setLoading(true);
     setInputMessage('');
 
+    // Optimistic UI - do this FIRST so the UI transitions to chat view immediately
+    const tempUserMsg: Message = {
+      MessageID: 'temp-user-' + Date.now(),
+      ConversationID: activeConvId || 'temp-conv',
+      Sender: 'User',
+      MessageText: text,
+      CreatedDate: new Date().toISOString()
+    };
+    setMessages(prev => [...prev, tempUserMsg]);
+
     let currentConvId = activeConvId;
 
     // Auto-create a conversation if none is active
@@ -331,19 +345,10 @@ export default function Home({ user, onLogout }: HomeProps) {
         console.error('Error auto-creating conversation', e);
         triggerToast('Gagal membuat sesi obrolan baru: ' + e.message, 'error');
         setLoading(false);
+        setMessages(prev => prev.filter(m => m.MessageID !== tempUserMsg.MessageID));
         return;
       }
     }
-
-    // Optimistic UI
-    const tempUserMsg: Message = {
-      MessageID: 'temp-user-' + Date.now(),
-      ConversationID: currentConvId,
-      Sender: 'User',
-      MessageText: text,
-      CreatedDate: new Date().toISOString()
-    };
-    setMessages(prev => [...prev, tempUserMsg]);
 
     try {
       const data = await sendMessageApi(currentConvId, text, selectedModel);
@@ -356,13 +361,11 @@ export default function Home({ user, onLogout }: HomeProps) {
         }
       } else {
         triggerToast('Gagal mengirim pesan: ' + data.error, 'error');
-        // Remove optimistic message on failure
         setMessages(prev => prev.filter(m => m.MessageID !== tempUserMsg.MessageID));
       }
     } catch (e: any) {
       console.error('Error sending message', e);
       triggerToast('Gagal mengirim pesan: ' + e.message, 'error');
-      // Remove optimistic message on failure
       setMessages(prev => prev.filter(m => m.MessageID !== tempUserMsg.MessageID));
     } finally {
       setLoading(false);

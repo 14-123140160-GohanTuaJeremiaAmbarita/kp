@@ -1,8 +1,5 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Brain, X, Trash2, Database, Download, FileText, HelpCircle } from 'lucide-react';
 import { Conversation, Message } from '../../types/chat';
-import { Memory } from '../../types/models';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 

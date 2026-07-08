@@ -1,0 +1,1 @@
+{"model": "google-ai-studio/gemini-3.5-flash", "messages": [{"role":"user","content":"halo"}], "max_tokens": 50}

@@ -122,25 +122,21 @@ Kalimat pengguna: "${messageText}"`;
     }
 
     // 8. Generate Human-Friendly Synthesized Summary Response
-    const summarizationSystem = `
-Kamu adalah Smart IT Assistant PT Voksel Electric Tbk. Kamu ramah, profesional, dan membantu mengelola operasional IT di perusahaan kabel PT Voksel Electric Tbk.
-Kamu akan diberikan pesan pengguna, kueri SQL yang dijalankan (jika ada), hasil kueri dari database dalam bentuk JSON (jika ada), serta fakta yang kamu ingat tentang pengguna.
-
-Tugas kamu:
-- Berikan balasan dalam bahasa Indonesia yang ringkas, elegan, dan profesional.
-- Rangkum data yang didapat dari database agar mudah dibaca oleh manusia. JANGAN menulis seluruh data dalam bentuk tabel Markdown yang sangat besar jika baris data melebihi 15 baris. Tampilkan maksimal 10-15 baris contoh saja sebagai preview di tabel Markdown, lalu tambahkan catatan bahwa "Tabel lengkap berisi [X] baris data dapat Anda lihat pada bagian 'Lihat Kueri SQL' di bawah dan siap diunduh dalam format Excel atau PDF."
-- Beritahu pengguna secara implisit/eksplisit jika data berhasil diambil dari database produksi ITOpr (Readonly) secara langsung.
-- JANGAN menyebutkan hal teknis seperti "JSON string", "Express server", "mock data" or "simulated database". Bicaralah seolah-olah kamu tersambung ke sistem SAP / IT Operations utama PT Voksel Electric Tbk.
-- Jika pengguna meminta untuk mengunduh/mengekspor data dan kueri SQL sebelumnya berhasil ditemukan, beritahu pengguna bahwa data siap diunduh dalam format Microsoft Excel atau dokumen PDF menggunakan tombol unduh yang telah disediakan di bawah gelembung obrolan ini.
-- Jika ada kesalahan SQL (sqlError), beritahu pengguna dengan sopan bahwa kueri ditolak oleh lapisan keamanan database (SQL Security Layer) atau ada kesalahan sintaks, lalu tawarkan solusi.
-`;
+    const summarizationSystem = `Kamu adalah Smart IT Assistant PT Voksel Electric Tbk. Jawab dalam Bahasa Indonesia, ringkas dan profesional.
+ATURAN KETAT:
+- Sapaan (halo/hai/hi): Balas hangat, perkenalkan diri, tawarkan bantuan (data karyawan, komputer, tiket, grafik, ekspor). Gunakan emoji 👋.
+- Ada data DB: Tulis ringkasan naratif + maks 3 insight. DILARANG menulis daftar data atau tabel Markdown. Frontend sudah tampilkan tabel & grafik otomatis.
+- Tidak ada data: Jawab pertanyaan dengan pengetahuan umum secara cerdas.
+- Jawaban maks 150 kata.`;
 
     let sqlResultPreview = 'Tidak ada hasil';
     if (sqlResult && Array.isArray(sqlResult)) {
+      const columns = sqlResult.length > 0 ? Object.keys(sqlResult[0]) : [];
       sqlResultPreview = JSON.stringify({
         totalRowsCount: sqlResult.length,
-        note: "Ini adalah 15 baris pertama saja untuk contoh ringkasan. Sisanya ditampilkan di UI table di luar AI response.",
-        rowsPreview: sqlResult.slice(0, 15)
+        columns: columns,
+        note: "Data lengkap sudah ditampilkan otomatis oleh sistem frontend dalam bentuk tabel interaktif dan grafik. JANGAN menulis ulang data baris per baris.",
+        sampleRow: sqlResult.length > 0 ? sqlResult[0] : null
       });
     } else if (sqlResult) {
       sqlResultPreview = JSON.stringify(sqlResult);
@@ -157,11 +153,18 @@ ${memoryContext}
 Tulis tanggapan akhir yang profesional dan informatif dalam Bahasa Indonesia.`;
 
     let finalAnswer = 'Maaf, saya tidak dapat merumuskan tanggapan saat ini.';
-    try {
-      finalAnswer = await this.openRouter.generateContent(summaryPrompt, summarizationSystem, false, model);
-    } catch (err: any) {
-      console.error('Error generating response summary:', err);
-      finalAnswer = `Maaf, terjadi kesalahan saat merumuskan tanggapan: ${err.message}`;
+    const isGraphRequest = /grafik|chart|diagram|plot|visualisasi/i.test(messageText);
+
+    if (isGraphRequest && sqlResult && Array.isArray(sqlResult) && sqlResult.length > 0) {
+      // User requested a graph and data is available. Skip the LLM small-talk completely.
+      finalAnswer = '';
+    } else {
+      try {
+        finalAnswer = await this.openRouter.generateContent(summaryPrompt, summarizationSystem, false, model, 200);
+      } catch (err: any) {
+        console.error('Error generating response summary:', err);
+        finalAnswer = `Maaf, terjadi kesalahan saat merumuskan tanggapan: ${err.message}`;
+      }
     }
 
     // 9. Persist AI Response in the Conversation History

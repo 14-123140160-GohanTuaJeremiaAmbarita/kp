@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import { Cpu, Download, FileText } from 'lucide-react';
-import DataTable from './DataTable';
 
 interface SqlCardProps {
   sqlQuery: string;
@@ -64,13 +63,6 @@ export default function SqlCard({
       }`}>
         {sqlQuery}
       </div>
-
-      {/* Tabular SQL Results (if present) */}
-      {sqlResult && (
-        <div className="max-h-60 overflow-auto custom-scrollbar">
-          <DataTable jsonResult={sqlResult} theme={theme} />
-        </div>
-      )}
     </motion.div>
   );
 }

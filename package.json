@@ -10,12 +10,15 @@
     "start": "npm start --prefix backend",
     "dev:backend": "npm run dev --prefix backend",
     "dev:frontend": "npm run dev --prefix frontend",
-    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\""
+    "dev": "concurrently \"npm run dev:backend\" \"npm run dev:frontend\"",
+    "tunnel": "node scripts/tunnel.js",
+    "tunnel:dev": "node scripts/tunnel.js --dev"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3"
   },
   "devDependencies": {
+    "@ngrok/ngrok": "^1.7.0",
     "concurrently": "^9.1.2"
   }
 }

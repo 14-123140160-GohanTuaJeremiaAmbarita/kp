@@ -28,7 +28,7 @@ Pesan Pengguna Sekarang: "${messageText}"
 Format keluaran Anda harus berupa objek JSON murni tanpa hiasan markdown atau pembungkus lain (hanya objek JSON).`;
 
     try {
-      const responseText = await this.openRouter.generateContent(prompt, schemaInstruction, true, model);
+      const responseText = await this.openRouter.generateContent(prompt, schemaInstruction, true, model, 120);
       const parsed: SqlQueryResponse | null = this.openRouter.tryParseAiJson(responseText);
 
       if (!parsed) {
