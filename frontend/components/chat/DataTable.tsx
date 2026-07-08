@@ -61,13 +61,27 @@ export default function DataTable({ jsonResult, theme = 'dark' }: DataTableProps
       return [...filteredData].sort((a, b) => {
         const valA = a[sortColumn] ?? '';
         const valB = b[sortColumn] ?? '';
+        
+        // If both are strictly numbers
         if (typeof valA === 'number' && typeof valB === 'number') {
           return sortDirection === 'asc' ? valA - valB : valB - valA;
         }
-        const strA = String(valA).toLowerCase();
-        const strB = String(valB).toLowerCase();
-        if (sortDirection === 'asc') return strA.localeCompare(strB);
-        return strB.localeCompare(strA);
+
+        const strA = String(valA);
+        const strB = String(valB);
+        
+        // Check if both can be parsed as numbers (useful for numeric strings like "00020")
+        const numA = Number(strA);
+        const numB = Number(strB);
+        if (strA.trim() !== '' && strB.trim() !== '' && !isNaN(numA) && !isNaN(numB)) {
+          return sortDirection === 'asc' ? numA - numB : numB - numA;
+        }
+
+        // Fallback to case-insensitive localeCompare with numeric sorting capability
+        const strALower = strA.toLowerCase();
+        const strBLower = strB.toLowerCase();
+        if (sortDirection === 'asc') return strALower.localeCompare(strBLower, undefined, { numeric: true });
+        return strBLower.localeCompare(strALower, undefined, { numeric: true });
       });
     }, [filteredData, sortColumn, sortDirection]);
 
@@ -97,8 +111,25 @@ export default function DataTable({ jsonResult, theme = 'dark' }: DataTableProps
 
     // Detect column types for styling
     const isNumericColumn = (h: string) => {
+      const lowerH = h.toLowerCase();
+      // Exclude identifier columns that shouldn't be formatted as numbers
+      if (['nrp', 'id', 'nik', 'no', 'nomor', 'phone', 'telp', 'kode', 'code', 'nip'].some(n => lowerH.includes(n))) {
+        return false;
+      }
+
       const sample = data.slice(0, 5);
-      return sample.every(row => typeof row[h] === 'number' || (row[h] !== null && !isNaN(Number(row[h]))));
+      return sample.every(row => {
+        const val = row[h];
+        if (val === null || val === undefined || val === '') return true; // Ignore empty values in sample
+        if (typeof val === 'number') return true;
+        if (typeof val === 'string') {
+          if (isNaN(Number(val))) return false;
+          // Don't treat strings with leading zeros (e.g. "00020") as numbers
+          if (val.length > 1 && val.startsWith('0') && !val.startsWith('0.')) return false;
+          return true;
+        }
+        return false;
+      });
     };
 
     return (
