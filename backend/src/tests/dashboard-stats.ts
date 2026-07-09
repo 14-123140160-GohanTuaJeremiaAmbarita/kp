@@ -14,6 +14,14 @@ async function main() {
   assert.ok(stats.assetsByDepartment.length > 0, 'Distribusi aset kosong');
   assert.ok(stats.woByPic.length > 0, 'Performa PIC kosong');
   assert.ok(stats.woMonthlyTrend.length > 0, 'Tren WO kosong');
+  assert.ok(stats.devicesByAgeAndCondition.length > 0, 'Data umur dan kondisi perangkat kosong');
+
+  const activeReportDevices = stats.devicesByTypeAndStatus.reduce((sum, row) => sum + row.y, 0);
+  const usedReportDevices = stats.devicesByUsed.reduce((sum, row) => sum + row.user + row.nonUser, 0);
+  const ageConditionDevices = stats.devicesByAgeAndCondition.reduce((sum, row) => sum + row.count, 0);
+
+  assert.equal(usedReportDevices, activeReportDevices, 'Total laporan penggunaan tidak sama dengan perangkat aktif');
+  assert.equal(ageConditionDevices, activeReportDevices, 'Total laporan umur/kondisi tidak sama dengan perangkat aktif');
 
   console.log(JSON.stringify({
     employees: stats.totalEmployees,

@@ -927,149 +927,284 @@ export class Database {
   // --- Dashboard Stats Compilation ---
   public async getDashboardStats(): Promise<DashboardStats> {
     const pool = getCompanyDbPool();
+
     if (pool) {
       try {
         const [
-          summaryRes, catRes, prioRes, brandRes, deptRes, empDeptRes,
-          woStatusRes, compStatusRes, compTypeRes, woTypeRes, woDifficultyRes,
-          woCauseRes, woPicRes, woTrendRes, assetDeptRes,
-          devicesTypeStatusRes, devicesUsedRes, devicesAgeCondRes
+          summaryRes,
+          catRes,
+          prioRes,
+          brandRes,
+          deptRes,
+          empDeptRes,
+          woStatusRes,
+          compStatusRes,
+          compTypeRes,
+          woTypeRes,
+          woDifficultyRes,
+          woCauseRes,
+          woPicRes,
+          woTrendRes,
+          assetDeptRes,
+          devicesTypeStatusRes,
+          devicesUsedRes,
+          devicesAgeConditionRes
         ] = await Promise.all([
           pool.request().query(`
             SELECT
               (SELECT COUNT(*) FROM TD_karyawan WHERE status = 'Aktif') AS totalEmployees,
+
               (SELECT COUNT(*) FROM TD_computer) AS totalComputers,
               (SELECT COUNT(*) FROM TD_computer WHERE Aktif = 'Y') AS activeComputers,
-              (SELECT COUNT(*) FROM TD_computer WHERE Aktif <> 'Y') AS inactiveComputers,
+              (SELECT COUNT(*) FROM TD_computer WHERE Aktif <> 'Y' OR Aktif IS NULL) AS inactiveComputers,
+
               (SELECT COUNT(*) FROM TD_monitor) AS totalMonitors,
               (SELECT COUNT(*) FROM TD_monitor WHERE Aktif = 'Y') AS activeMonitors,
+
               (SELECT COUNT(*) FROM TD_printer) AS totalPrinters,
               (SELECT COUNT(*) FROM TD_printer WHERE Aktif = 'Y') AS activePrinters,
+
               (SELECT COALESCE(SUM(COALESCE(jumlah, 1)), 0) FROM TD_CCTV) AS totalCctvUnits,
               (SELECT COALESCE(SUM(COALESCE(qty, 1)), 0) FROM TD_License) AS totalLicenses,
+
               (SELECT COUNT(*) FROM TD_TICKET) AS totalTickets,
               (SELECT COUNT(*) FROM TD_TICKET WHERE NoWO IS NULL OR LTRIM(RTRIM(NoWO)) = '') AS openTickets,
               (SELECT COUNT(*) FROM TD_TICKET WHERE NoWO IS NOT NULL AND LTRIM(RTRIM(NoWO)) <> '') AS resolvedTickets,
+
               (SELECT COUNT(*) FROM TD_WO) AS totalWorkOrders,
-              (SELECT COUNT(*) FROM TD_WO WHERE Closed = 0) AS openWorkOrders,
+              (SELECT COUNT(*) FROM TD_WO WHERE Closed = 0 OR Closed IS NULL) AS openWorkOrders,
               (SELECT COUNT(*) FROM TD_WO WHERE Closed = 1) AS closedWorkOrders,
+
               (SELECT COALESCE(AVG(CAST(TotalDowntime AS FLOAT)), 0) FROM TD_WO WHERE Closed = 1) AS averageDowntime
           `),
+
           pool.request().query(`
-          SELECT 
-            CASE 
-              WHEN problem LIKE '%network%' OR problem LIKE '%koneksi%' OR problem LIKE '%lan%' OR problem LIKE '%internet%' THEN 'Network'
-              WHEN problem LIKE '%printer%' OR problem LIKE '%komputer%' OR problem LIKE '%laptop%' OR problem LIKE '%mouse%' OR problem LIKE '%keyboard%' THEN 'Hardware'
-              WHEN problem LIKE '%sistem%' OR problem LIKE '%erp%' OR problem LIKE '%aplikasi%' THEN 'System'
-              ELSE 'Software'
-            END as name,
-            COUNT(*) as value
-          FROM TD_TICKET
-          GROUP BY 
-            CASE 
-              WHEN problem LIKE '%network%' OR problem LIKE '%koneksi%' OR problem LIKE '%lan%' OR problem LIKE '%internet%' THEN 'Network'
-              WHEN problem LIKE '%printer%' OR problem LIKE '%komputer%' OR problem LIKE '%laptop%' OR problem LIKE '%mouse%' OR problem LIKE '%keyboard%' THEN 'Hardware'
-              WHEN problem LIKE '%sistem%' OR problem LIKE '%erp%' OR problem LIKE '%aplikasi%' THEN 'System'
-              ELSE 'Software'
-            END
+            SELECT 
+              CASE 
+                WHEN problem LIKE '%network%' OR problem LIKE '%koneksi%' OR problem LIKE '%lan%' OR problem LIKE '%internet%' THEN 'Network'
+                WHEN problem LIKE '%printer%' OR problem LIKE '%komputer%' OR problem LIKE '%laptop%' OR problem LIKE '%mouse%' OR problem LIKE '%keyboard%' THEN 'Hardware'
+                WHEN problem LIKE '%sistem%' OR problem LIKE '%erp%' OR problem LIKE '%aplikasi%' THEN 'System'
+                ELSE 'Software'
+              END AS name,
+              COUNT(*) AS value
+            FROM TD_TICKET
+            GROUP BY 
+              CASE 
+                WHEN problem LIKE '%network%' OR problem LIKE '%koneksi%' OR problem LIKE '%lan%' OR problem LIKE '%internet%' THEN 'Network'
+                WHEN problem LIKE '%printer%' OR problem LIKE '%komputer%' OR problem LIKE '%laptop%' OR problem LIKE '%mouse%' OR problem LIKE '%keyboard%' THEN 'Hardware'
+                WHEN problem LIKE '%sistem%' OR problem LIKE '%erp%' OR problem LIKE '%aplikasi%' THEN 'System'
+                ELSE 'Software'
+              END
+            ORDER BY value DESC
           `),
-          pool.request().query("SELECT 'Belum diklasifikasikan' as name, COUNT(*) as value FROM TD_TICKET"),
-          pool.request().query('SELECT CPU_Merk as name, COUNT(*) as value FROM TD_computer GROUP BY CPU_Merk'),
+
           pool.request().query(`
-          SELECT k.Dept as name, COUNT(*) as value 
-          FROM TD_TICKET t
-          INNER JOIN TD_karyawan k ON t.NRP = k.Nrp
-          GROUP BY k.Dept
+            SELECT 'Belum diklasifikasikan' AS name, COUNT(*) AS value
+            FROM TD_TICKET
           `),
-          pool.request().query("SELECT Dept as name, COUNT(*) as value FROM TD_karyawan WHERE status = 'Aktif' GROUP BY Dept ORDER BY value DESC"),
+
           pool.request().query(`
-          SELECT 
-            CASE WHEN Closed = 1 THEN 'Selesai' ELSE 'Terbuka' END as name,
-            COUNT(*) as value 
-          FROM TD_WO 
-          GROUP BY Closed
+            SELECT COALESCE(NULLIF(LTRIM(RTRIM(CPU_Merk)), ''), 'Tidak diketahui') AS name,
+                   COUNT(*) AS value
+            FROM TD_computer
+            GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(CPU_Merk)), ''), 'Tidak diketahui')
+            ORDER BY value DESC
           `),
+
           pool.request().query(`
-          SELECT 
-            CASE WHEN Aktif = 'Y' THEN 'Aktif' ELSE 'Status ' + ISNULL(Aktif, 'Kosong') END as name,
-            COUNT(*) as value 
-          FROM TD_computer 
-          GROUP BY Aktif
+            SELECT COALESCE(NULLIF(LTRIM(RTRIM(k.Dept)), ''), 'Tidak diketahui') AS name,
+                   COUNT(*) AS value
+            FROM TD_TICKET t
+            INNER JOIN TD_karyawan k ON t.NRP = k.Nrp
+            GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(k.Dept)), ''), 'Tidak diketahui')
+            ORDER BY value DESC
           `),
-          pool.request().query("SELECT COALESCE(Jenis, 'Tidak diketahui') AS name, COUNT(*) AS value FROM TD_computer GROUP BY Jenis ORDER BY value DESC"),
-          pool.request().query("SELECT COALESCE(Type, 'Tidak diketahui') AS name, COUNT(*) AS value FROM TD_WO GROUP BY Type ORDER BY value DESC"),
-          pool.request().query("SELECT COALESCE(TingkatKesulitan, 'Tidak diketahui') AS name, COUNT(*) AS value FROM TD_WO GROUP BY TingkatKesulitan ORDER BY value DESC"),
-          pool.request().query("SELECT COALESCE(Penyebab, 'Tidak diketahui') AS name, COUNT(*) AS value FROM TD_WO GROUP BY Penyebab ORDER BY value DESC"),
+
           pool.request().query(`
-            SELECT COALESCE(ITPic, 'Tidak diketahui') AS name,
-              COUNT(*) AS total,
-              SUM(CASE WHEN Closed = 1 THEN 1 ELSE 0 END) AS closed,
-              COALESCE(AVG(CASE WHEN Closed = 1 THEN CAST(TotalDowntime AS FLOAT) END), 0) AS averageDowntime
+            SELECT COALESCE(NULLIF(LTRIM(RTRIM(Dept)), ''), 'Tidak diketahui') AS name,
+                   COUNT(*) AS value
+            FROM TD_karyawan
+            WHERE status = 'Aktif'
+            GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(Dept)), ''), 'Tidak diketahui')
+            ORDER BY value DESC
+          `),
+
+          pool.request().query(`
+            SELECT 
+              CASE WHEN Closed = 1 THEN 'Selesai' ELSE 'Terbuka' END AS name,
+              COUNT(*) AS value 
+            FROM TD_WO 
+            GROUP BY CASE WHEN Closed = 1 THEN 'Selesai' ELSE 'Terbuka' END
+            ORDER BY value DESC
+          `),
+
+          pool.request().query(`
+            SELECT 
+              CASE 
+                WHEN Aktif = 'Y' THEN 'Aktif'
+                WHEN Aktif IS NULL OR LTRIM(RTRIM(Aktif)) = '' THEN 'Status Kosong'
+                ELSE 'Status ' + LTRIM(RTRIM(Aktif))
+              END AS name,
+              COUNT(*) AS value 
+            FROM TD_computer 
+            GROUP BY 
+              CASE 
+                WHEN Aktif = 'Y' THEN 'Aktif'
+                WHEN Aktif IS NULL OR LTRIM(RTRIM(Aktif)) = '' THEN 'Status Kosong'
+                ELSE 'Status ' + LTRIM(RTRIM(Aktif))
+              END
+            ORDER BY value DESC
+          `),
+
+          pool.request().query(`
+            SELECT COALESCE(NULLIF(LTRIM(RTRIM(Jenis)), ''), 'Tidak diketahui') AS name,
+                   COUNT(*) AS value
+            FROM TD_computer
+            GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(Jenis)), ''), 'Tidak diketahui')
+            ORDER BY value DESC
+          `),
+
+          pool.request().query(`
+            SELECT COALESCE(NULLIF(LTRIM(RTRIM(Type)), ''), 'Tidak diketahui') AS name,
+                   COUNT(*) AS value
             FROM TD_WO
-            GROUP BY ITPic
+            GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(Type)), ''), 'Tidak diketahui')
+            ORDER BY value DESC
+          `),
+
+          pool.request().query(`
+            SELECT COALESCE(NULLIF(LTRIM(RTRIM(TingkatKesulitan)), ''), 'Tidak diketahui') AS name,
+                   COUNT(*) AS value
+            FROM TD_WO
+            GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(TingkatKesulitan)), ''), 'Tidak diketahui')
+            ORDER BY value DESC
+          `),
+
+          pool.request().query(`
+            SELECT COALESCE(NULLIF(LTRIM(RTRIM(Penyebab)), ''), 'Tidak diketahui') AS name,
+                   COUNT(*) AS value
+            FROM TD_WO
+            GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(Penyebab)), ''), 'Tidak diketahui')
+            ORDER BY value DESC
+          `),
+
+          pool.request().query(`
+            SELECT COALESCE(NULLIF(LTRIM(RTRIM(ITPic)), ''), 'Tidak diketahui') AS name,
+                   COUNT(*) AS total,
+                   SUM(CASE WHEN Closed = 1 THEN 1 ELSE 0 END) AS closed,
+                   SUM(CASE WHEN Closed = 0 OR Closed IS NULL THEN 1 ELSE 0 END) AS openWo,
+                   COALESCE(AVG(CASE WHEN Closed = 1 THEN CAST(TotalDowntime AS FLOAT) END), 0) AS averageDowntime
+            FROM TD_WO
+            GROUP BY COALESCE(NULLIF(LTRIM(RTRIM(ITPic)), ''), 'Tidak diketahui')
             ORDER BY total DESC
           `),
+
           pool.request().query(`
-            WITH Latest AS (SELECT MAX([Date]) AS maxDate FROM TD_WO)
-            SELECT CONVERT(char(7), w.[Date], 120) AS month,
+            WITH Latest AS (
+              SELECT MAX([Date]) AS maxDate FROM TD_WO
+            )
+            SELECT 
+              CONVERT(char(7), w.[Date], 120) AS month,
               COUNT(*) AS total,
               SUM(CASE WHEN Closed = 1 THEN 1 ELSE 0 END) AS closed,
-              SUM(CASE WHEN Closed = 0 THEN 1 ELSE 0 END) AS [open]
-            FROM TD_WO w CROSS JOIN Latest l
+              SUM(CASE WHEN Closed = 0 OR Closed IS NULL THEN 1 ELSE 0 END) AS [open]
+            FROM TD_WO w
+            CROSS JOIN Latest l
             WHERE w.[Date] >= DATEADD(month, DATEDIFF(month, 0, l.maxDate) - 11, 0)
             GROUP BY CONVERT(char(7), w.[Date], 120)
             ORDER BY month
           `),
+
           pool.request().query(`
             WITH Departments AS (
               SELECT Dept FROM TD_computer
               UNION SELECT Dept FROM TD_monitor
               UNION SELECT Dept FROM TD_printer
             )
-            SELECT COALESCE(d.Dept, 'Tidak diketahui') AS name,
+            SELECT 
+              COALESCE(NULLIF(LTRIM(RTRIM(d.Dept)), ''), 'Tidak diketahui') AS name,
               (SELECT COUNT(*) FROM TD_computer c WHERE ISNULL(c.Dept, '') = ISNULL(d.Dept, '')) AS computers,
               (SELECT COUNT(*) FROM TD_monitor m WHERE ISNULL(m.Dept, '') = ISNULL(d.Dept, '')) AS monitors,
               (SELECT COUNT(*) FROM TD_printer p WHERE ISNULL(p.Dept, '') = ISNULL(d.Dept, '')) AS printers
             FROM Departments d
-            ORDER BY (SELECT COUNT(*) FROM TD_computer c WHERE ISNULL(c.Dept, '') = ISNULL(d.Dept, '')) DESC
+            ORDER BY computers DESC
           `),
-          pool.request().query(`
-            SELECT Jenis as type, Aktif, COUNT(*) as Count
-            FROM TD_computer
-            WHERE Jenis IN ('PC', 'ALL IN ONE', 'NOTEBOOK')
-            GROUP BY Jenis, Aktif
-          `),
-          pool.request().query(`
-            SELECT Jenis as type, 
-              CASE WHEN Nrp IS NOT NULL AND LTRIM(RTRIM(Nrp)) <> '' THEN 'User' ELSE 'Non-User' END as UsedType,
-              COUNT(*) as Count
-            FROM TD_computer
-            WHERE Jenis IN ('PC', 'ALL IN ONE', 'NOTEBOOK') AND Aktif = 'Y'
-            GROUP BY Jenis, CASE WHEN Nrp IS NOT NULL AND LTRIM(RTRIM(Nrp)) <> '' THEN 'User' ELSE 'Non-User' END
-          `),
+
           pool.request().query(`
             SELECT 
-              Jenis as type, 
-              ISNULL(perusahaan, 'VOKSEL') as location,
-              CASE WHEN CPU_RcptDate < DATEADD(year, -6, GETDATE()) THEN '> 6 Years' ELSE '<= 6 Years' END as ageGroup,
-              CASE WHEN Keterangan IS NOT NULL AND LTRIM(RTRIM(Keterangan)) <> '' AND Keterangan NOT IN ('OK', 'BAGUS', 'GOOD') THEN 'Not Good' ELSE 'Good' END as condition,
-              COUNT(*) as count
+              UPPER(LTRIM(RTRIM(Jenis))) AS type,
+              Aktif,
+              COUNT(*) AS Count
             FROM TD_computer
-            WHERE Aktif = 'Y' AND Jenis IN ('PC', 'ALL IN ONE', 'NOTEBOOK')
-            GROUP BY Jenis, ISNULL(perusahaan, 'VOKSEL'),
-              CASE WHEN CPU_RcptDate < DATEADD(year, -6, GETDATE()) THEN '> 6 Years' ELSE '<= 6 Years' END,
-              CASE WHEN Keterangan IS NOT NULL AND LTRIM(RTRIM(Keterangan)) <> '' AND Keterangan NOT IN ('OK', 'BAGUS', 'GOOD') THEN 'Not Good' ELSE 'Good' END
+            WHERE UPPER(LTRIM(RTRIM(Jenis))) IN ('PC', 'ALL IN ONE', 'NOTEBOOK')
+            GROUP BY UPPER(LTRIM(RTRIM(Jenis))), Aktif
+          `),
+
+          pool.request().query(`
+            SELECT 
+              UPPER(LTRIM(RTRIM(Jenis))) AS type,
+              CASE 
+                WHEN UserNama IS NOT NULL AND LTRIM(RTRIM(UserNama)) <> '' THEN 'User'
+                ELSE 'Non-User'
+              END AS UsedType,
+              COUNT(*) AS Count
+            FROM TD_computer
+            WHERE UPPER(LTRIM(RTRIM(Jenis))) IN ('PC', 'ALL IN ONE', 'NOTEBOOK') 
+              AND UPPER(LTRIM(RTRIM(Aktif))) = 'Y'
+            GROUP BY UPPER(LTRIM(RTRIM(Jenis))),
+              CASE 
+                WHEN UserNama IS NOT NULL AND LTRIM(RTRIM(UserNama)) <> '' THEN 'User'
+                ELSE 'Non-User'
+              END
+          `),
+
+          pool.request().query(`
+            SELECT
+              UPPER(LTRIM(RTRIM(Jenis))) AS type,
+              UPPER(LTRIM(RTRIM(perusahaan))) AS location,
+              CASE
+                WHEN CPU_RcptDate IS NOT NULL
+                  AND CPU_RcptDate < DATEADD(YEAR, -6, CAST(GETDATE() AS date))
+                  THEN '> 6 Years'
+                ELSE '<= 6 Years'
+              END AS ageGroup,
+              CASE
+                WHEN UPPER(LTRIM(RTRIM(ISNULL(Check_List, '')))) = 'Y'
+                  THEN 'Good'
+                ELSE 'Not Good'
+              END AS condition,
+              COUNT(*) AS count
+            FROM TD_computer
+            WHERE UPPER(LTRIM(RTRIM(Jenis))) IN ('PC', 'ALL IN ONE', 'NOTEBOOK')
+              AND UPPER(LTRIM(RTRIM(Aktif))) = 'Y'
+              AND UPPER(LTRIM(RTRIM(perusahaan))) IN ('VOKSEL', 'PME', 'BPS')
+            GROUP BY
+              UPPER(LTRIM(RTRIM(Jenis))),
+              UPPER(LTRIM(RTRIM(perusahaan))),
+              CASE
+                WHEN CPU_RcptDate IS NOT NULL
+                  AND CPU_RcptDate < DATEADD(YEAR, -6, CAST(GETDATE() AS date))
+                  THEN '> 6 Years'
+                ELSE '<= 6 Years'
+              END,
+              CASE
+                WHEN UPPER(LTRIM(RTRIM(ISNULL(Check_List, '')))) = 'Y'
+                  THEN 'Good'
+                ELSE 'Not Good'
+              END
           `)
         ]);
 
-        // Sort and group computer brands to top 5 + "Lainnya" to prevent chart label overlaps
-        const brandSorted = brandRes.recordset.map((r: any) => ({
-          name: r.name ? r.name.trim() : 'Lainnya',
-          value: r.value
-        })).sort((a: any, b: any) => b.value - a.value);
+        const brandSorted = brandRes.recordset
+          .map((r: any) => ({
+            name: r.name ? String(r.name).trim() : 'Lainnya',
+            value: Number(r.value || 0)
+          }))
+          .sort((a: any, b: any) => b.value - a.value);
 
         const topBrands: { name: string; value: number }[] = [];
         let otherValue = 0;
+
         for (let i = 0; i < brandSorted.length; i++) {
           if (i < 5) {
             topBrands.push(brandSorted[i]);
@@ -1077,51 +1212,87 @@ export class Database {
             otherValue += brandSorted[i].value;
           }
         }
+
         if (otherValue > 0) {
           topBrands.push({ name: 'Lainnya', value: otherValue });
         }
 
         const summary = summaryRes.recordset[0];
+
         const completionRate = summary.totalWorkOrders > 0
           ? Number(((summary.closedWorkOrders / summary.totalWorkOrders) * 100).toFixed(1))
           : 0;
 
         return {
           ...summary,
+
           completionRate,
           averageDowntime: Math.round(summary.averageDowntime || 0),
-          ticketsByCategory: catRes.recordset.map(r => ({ name: r.name || 'Software', value: r.value })),
-          ticketsByPriority: prioRes.recordset.map(r => ({ name: r.name, value: r.value })),
+
+          ticketsByCategory: catRes.recordset.map((r: any) => ({
+            name: r.name || 'Software',
+            value: Number(r.value || 0)
+          })),
+
+          ticketsByPriority: prioRes.recordset.map((r: any) => ({
+            name: r.name,
+            value: Number(r.value || 0)
+          })),
+
           computersByBrand: topBrands,
-          computersByType: compTypeRes.recordset,
-          ticketsByDepartment: deptRes.recordset.map(r => ({ name: r.name || 'Lainnya', value: r.value })),
-          employeesByDepartment: empDeptRes.recordset.map(r => ({ name: r.name ? r.name.trim() : 'Lainnya', value: r.value })),
+
+          computersByType: compTypeRes.recordset.map((r: any) => ({
+            name: r.name,
+            value: Number(r.value || 0)
+          })),
+
+          ticketsByDepartment: deptRes.recordset.map((r: any) => ({
+            name: r.name || 'Lainnya',
+            value: Number(r.value || 0)
+          })),
+
+          employeesByDepartment: empDeptRes.recordset.map((r: any) => ({
+            name: r.name ? String(r.name).trim() : 'Lainnya',
+            value: Number(r.value || 0)
+          })),
+
           assetsByDepartment: assetDeptRes.recordset,
-          woStatus: woStatusRes.recordset.map(r => ({ name: r.name || 'In Progress', value: r.value })),
+
+          woStatus: woStatusRes.recordset.map((r: any) => ({
+            name: r.name || 'In Progress',
+            value: Number(r.value || 0)
+          })),
+
           woByType: woTypeRes.recordset,
           woByDifficulty: woDifficultyRes.recordset,
           woByCause: woCauseRes.recordset,
           woByPic: woPicRes.recordset,
           woMonthlyTrend: woTrendRes.recordset,
           computerStatus: compStatusRes.recordset,
-          devicesByTypeAndStatus: [
-            ...['PC', 'ALL IN ONE', 'NOTEBOOK'].map(type => {
-              const y = devicesTypeStatusRes.recordset.find(r => r.type === type && r.Aktif === 'Y')?.Count || 0;
-              const n = devicesTypeStatusRes.recordset.find(r => r.type === type && r.Aktif === 'N')?.Count || 0;
-              const p = devicesTypeStatusRes.recordset.find(r => r.type === type && r.Aktif === 'P')?.Count || 0;
-              return { type, y, n, p };
-            })
-          ],
-          devicesByUsed: [
-            ...['PC', 'ALL IN ONE', 'NOTEBOOK'].map(type => {
-              const user = devicesUsedRes.recordset.find(r => r.type === type && r.UsedType === 'User')?.Count || 0;
-              const nonUser = devicesUsedRes.recordset.find(r => r.type === type && r.UsedType === 'Non-User')?.Count || 0;
-              return { type, user, nonUser };
-            })
-          ],
-          devicesByAgeAndCondition: devicesAgeCondRes.recordset.map(r => ({
-            type: r.type, location: r.location, ageGroup: r.ageGroup, condition: r.condition, count: r.count
+
+          devicesByTypeAndStatus: ['PC', 'ALL IN ONE', 'NOTEBOOK'].map(type => {
+            const y = Number(devicesTypeStatusRes.recordset.find((r: any) => r.type === type && r.Aktif === 'Y')?.Count || 0);
+            const n = Number(devicesTypeStatusRes.recordset.find((r: any) => r.type === type && r.Aktif === 'N')?.Count || 0);
+            const p = Number(devicesTypeStatusRes.recordset.find((r: any) => r.type === type && r.Aktif === 'P')?.Count || 0);
+
+            return { type, y, n, p };
+          }),
+
+          devicesByUsed: ['PC', 'ALL IN ONE', 'NOTEBOOK'].map(type => {
+            const user = Number(devicesUsedRes.recordset.find((r: any) => r.type === type && r.UsedType === 'User')?.Count || 0);
+            const nonUser = Number(devicesUsedRes.recordset.find((r: any) => r.type === type && r.UsedType === 'Non-User')?.Count || 0);
+
+            return { type, user, nonUser };
+          }),
+
+          devicesByAgeAndCondition: devicesAgeConditionRes.recordset.map((r: any) => ({
+            type: String(r.type || '').trim(),
+            location: String(r.location || '').trim(),
+            ageGroup: r.ageGroup as '<= 6 Years' | '> 6 Years',
+            condition: r.condition as 'Good' | 'Not Good',
+            count: Number(r.count || 0)
           })),
+
           lastUpdated: new Date().toISOString()
         };
       } catch (err: any) {
@@ -1134,20 +1305,25 @@ export class Database {
       totalComputers: 0,
       activeComputers: 0,
       inactiveComputers: 0,
+
       totalMonitors: 0,
       activeMonitors: 0,
       totalPrinters: 0,
       activePrinters: 0,
       totalCctvUnits: 0,
       totalLicenses: 0,
+
       totalTickets: 0,
       openTickets: 0,
       resolvedTickets: 0,
+
       totalWorkOrders: 0,
       openWorkOrders: 0,
       closedWorkOrders: 0,
+
       completionRate: 0,
       averageDowntime: 0,
+
       ticketsByCategory: [],
       ticketsByPriority: [],
       computersByBrand: [],
@@ -1155,16 +1331,19 @@ export class Database {
       ticketsByDepartment: [],
       employeesByDepartment: [],
       assetsByDepartment: [],
+
       woStatus: [],
       woByType: [],
       woByDifficulty: [],
       woByCause: [],
       woByPic: [],
       woMonthlyTrend: [],
+
       computerStatus: [],
       devicesByTypeAndStatus: [],
       devicesByUsed: [],
       devicesByAgeAndCondition: [],
+
       lastUpdated: new Date().toISOString()
     };
   }

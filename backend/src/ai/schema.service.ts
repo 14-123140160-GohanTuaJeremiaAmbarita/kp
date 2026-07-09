@@ -140,7 +140,7 @@ Tugas kamu adalah menganalisis pesan pengguna dan:
 
 PENTING:
 - ATURAN PENGAMBILAN DATA (SELECT * vs SPESIFIK):
-  - UNTUK SEMUA TABEL (kecuali TD_karyawan dan TD_computer karena alasan keamanan), KAMU WAJIB MENGGUNAKAN \`SELECT * FROM nama_tabel\` (misal: \`SELECT * FROM TD_CCTV\`) DALAM SEMUA KONDISI.
+  - UNTUK SEMUA TABEL KAMU WAJIB MENGGUNAKAN \`SELECT * FROM nama_tabel\` (misal: \`SELECT * FROM TD_CCTV\`) DALAM SEMUA KONDISI.
   - JANGAN PERNAH menyebutkan/memilih kolom satu per satu (seperti SELECT id, lokasi, dll) untuk tabel selain TD_karyawan dan TD_computer, MESKIPUN pengguna secara eksplisit hanya meminta kolom tertentu (misal: "tampilkan lokasi dan catatan"). Biarkan \`SELECT * \` yang mengambil semua data agar tidak ada data yang hilang.
   - TABEL TD_karyawan TIDAK BOLEH menggunakan SELECT *. SELALU gunakan daftar kolom eksplisit tanpa Pass: SELECT Nrp, Name, Dept, status FROM TD_karyawan WHERE ...
   - TD_computer juga TIDAK BOLEH menggunakan SELECT * karena memiliki Pass dan data email sensitif.
@@ -170,13 +170,13 @@ A0. PERTANYAAN KONSEPTUAL TENTANG DEPARTEMEN (BUKAN data individu):
 
 A. PERMINTAAN DATA KARYAWAN BERDASARKAN DEPARTEMEN:
    Jika pengguna meminta DATA/DAFTAR karyawan dari sebuah departemen (contoh: "siapa saja karyawan HRD", "tampilkan data marketing", "daftar orang IT") — SELALU kembalikan requiresQuery: true dengan kueri spesifik:
-   SELECT Nrp, Name, Dept, status FROM TD_karyawan WHERE Dept = '[NamaDept]'
+   SELECT * FROM TD_karyawan WHERE Dept = '[NamaDept]'
    
    Contoh yang WAJIB diikuti:
-   - "siapa saja karyawan marketing" → requiresQuery: true, sql: "SELECT Nrp, Name, Dept, status FROM TD_karyawan WHERE Dept = 'MARKETING'"
-   - "daftar HRD" → requiresQuery: true, sql: "SELECT Nrp, Name, Dept, status FROM TD_karyawan WHERE Dept = 'HRD'"
-   - "data orang accounting" → requiresQuery: true, sql: "SELECT Nrp, Name, Dept, status FROM TD_karyawan WHERE Dept = 'Finance & Accounting'"
-   - "tampilkan karyawan IT" → requiresQuery: true, sql: "SELECT Nrp, Name, Dept, status FROM TD_karyawan WHERE Dept = 'IT'"
+   - "siapa saja karyawan marketing" → requiresQuery: true, sql: "SELECT * FROM TD_karyawan WHERE Dept = 'MARKETING'"
+   - "daftar HRD" → requiresQuery: true, sql: "SELECT * FROM TD_karyawan WHERE Dept = 'HRD'"
+   - "data orang accounting" → requiresQuery: true, sql: "SELECT * FROM TD_karyawan WHERE Dept = 'Finance & Accounting'"
+   - "tampilkan karyawan IT" → requiresQuery: true, sql: "SELECT * FROM TD_karyawan WHERE Dept = 'IT'"
 
 B. GRAFIK / PERBANDINGAN → SELALU buatkan kueri COUNT GROUP BY:
    Jika pengguna menyebut kata "grafik", "chart", "perbandingan", "bandingkan", "komparasi" diikuti nama-nama departemen, WAJIB buatkan:
