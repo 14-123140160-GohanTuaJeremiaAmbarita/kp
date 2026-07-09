@@ -1,35 +1,26 @@
 import { HistoryRepository } from '../repositories/history.repository';
 
+/**
+ * Vocabulary lookup only.
+ *
+ * This service no longer returns hard-coded SQL. Learned entries are supplied
+ * to the AI as language hints, while the AI remains responsible for intent
+ * understanding and SQL generation.
+ */
 export class QueryCacheService {
   private historyRepo = new HistoryRepository();
 
-  public async lookup(messageText: string): Promise<{ sql: string | null; fromLearning: boolean }> {
-    const cleanMsg = messageText.trim().toLowerCase();
-    const learnedWords = await this.historyRepo.getLearnedWords();
+  public async getVocabularyHints(messageText: string): Promise<string[]> {
+    const hints = await this.historyRepo.getQueryKnowledgeHints(8);
+    if (!hints.length) return [];
 
-    // 1. Direct match check
-    if (learnedWords[cleanMsg]) {
-      return { sql: learnedWords[cleanMsg], fromLearning: true };
-    }
-
-    // 2. Fuzzy/typo dictionary matching for words
-    const words = cleanMsg.split(/\s+/);
-    let changed = false;
-    const correctedWords = words.map(w => {
-      if (learnedWords[w]) {
-        changed = true;
-        return learnedWords[w];
-      }
-      return w;
+    const terms = new Set(
+      messageText.toLowerCase().split(/[^\p{L}\p{N}_]+/u).filter(word => word.length > 2)
+    );
+    const relevant = hints.filter(hint => {
+      const lowerHint = hint.toLowerCase();
+      return [...terms].some(term => lowerHint.includes(term));
     });
-
-    if (changed) {
-      const correctedMsg = correctedWords.join(' ');
-      if (learnedWords[correctedMsg]) {
-        return { sql: learnedWords[correctedMsg], fromLearning: true };
-      }
-    }
-
-    return { sql: null, fromLearning: false };
+    return relevant.slice(0, 4);
   }
 }

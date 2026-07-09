@@ -6,9 +6,9 @@ import ChatBubble from './ChatBubble';
 
 const ALL_SUGGESTIONS = [
   {
-    title: "Tampilkan tiket IT yang statusnya Open",
-    subtitle: "Melihat tiket yang belum terselesaikan",
-    command: "Tampilkan tiket IT yang statusnya Open"
+    title: "Work order yang masih terbuka",
+    subtitle: "TD_WO dengan Closed = 0",
+    command: "Tampilkan work order yang masih terbuka, lengkap dengan nomor WO, tanggal, departemen, kerusakan, dan PIC IT"
   },
   {
     title: "Berapa banyak komputer yang aktif?",
@@ -16,9 +16,9 @@ const ALL_SUGGESTIONS = [
     command: "Berapa banyak komputer yang berstatus aktif saat ini?"
   },
   {
-    title: "Tampilkan daftar divisi di perusahaan",
-    subtitle: "Melihat daftar divisi unik karyawan",
-    command: "Tampilkan semua departemen unik pada tabel TD_karyawan"
+    title: "Grafik kategori komputer",
+    subtitle: "Notebook, PC, All-in-One, dan Server",
+    command: "Buatkan grafik jumlah komputer berdasarkan kategori Jenis"
   },
   {
     title: "Tampilkan komputer dengan merk Lenovo",
@@ -26,29 +26,184 @@ const ALL_SUGGESTIONS = [
     command: "Tampilkan komputer yang memiliki CPU_Merk 'Lenovo'"
   },
   {
-    title: "Tampilkan tiket IT dari departemen GA",
-    subtitle: "Melihat keluhan dari divisi General Affairs",
-    command: "Tampilkan tiket IT yang diajukan oleh departemen GA"
+    title: "Daftar monitor aktif",
+    subtitle: "Inventaris dari TD_monitor",
+    command: "Tampilkan monitor yang aktif beserta kode, merek, tipe, departemen, dan komputer yang terhubung"
   },
   {
-    title: "Apa fungsi divisi HRD?",
-    subtitle: "Informasi mengenai divisi Human Resources",
-    command: "Apa fungsi utama divisi HRD di dalam perusahaan?"
+    title: "Daftar printer dan toner",
+    subtitle: "Inventaris dari TD_printer",
+    command: "Tampilkan printer aktif beserta kode, jenis, merek, tipe, toner, pengguna, dan departemen"
   },
   {
-    title: "Tampilkan data komputer jenis LAPTOP",
-    subtitle: "Mencari komputer bertipe laptop",
-    command: "Tampilkan data komputer yang memiliki tipe LAPTOP"
+    title: "Tampilkan data komputer jenis NOTEBOOK",
+    subtitle: "Mencari kategori perangkat laptop/notebook",
+    command: "Tampilkan data TD_computer dengan kategori Jenis NOTEBOOK"
   },
   {
-    title: "Tampilkan tiket IT yang belum diproses",
-    subtitle: "Mencari tiket IT tanpa NoWO",
-    command: "Tampilkan tiket IT yang kolom NoWO-nya kosong"
+    title: "Jadwal masa berlaku lisensi",
+    subtitle: "Daftar lisensi dan tanggal kedaluwarsa",
+    command: "Tampilkan semua lisensi beserta deskripsi, tanggal expired, tanggal renewal, supplier, perangkat instalasi, dan jumlah; urutkan dari yang paling cepat kedaluwarsa"
   },
   {
-    title: "Tampilkan rincian tindakan perbaikan",
-    subtitle: "Melihat tindakan perbaikan pada TD_WO",
-    command: "Tampilkan rincian tindakan perbaikan (DeskripsiTindakan) pada tabel TD_WO"
+    title: "Distribusi toner per bagian",
+    subtitle: "Total seluruh riwayat distribusi",
+    command: "Buat grafik total qty distribusi toner per bagian"
+  },
+  {
+    title: "Status kamera CCTV",
+    subtitle: "Jumlah kamera berdasarkan status",
+    command: "Buat grafik jumlah CCTV berdasarkan status"
+  },
+  {
+    title: "Kinerja PIC IT",
+    subtitle: "Jumlah WO selesai dan downtime",
+    command: "Bandingkan jumlah work order selesai dan rata-rata downtime untuk setiap PIC IT"
+  },
+  {
+    title: "Cari extension telepon",
+    subtitle: "Daftar PABX per bagian",
+    command: "Tampilkan daftar extension telepon PABX beserta nama, line, dan bagian"
+  },
+  {
+    title: "Grafik karyawan per departemen",
+    subtitle: "Distribusi karyawan aktif",
+    command: "Buat grafik jumlah karyawan aktif pada setiap departemen"
+  },
+  {
+    title: "Komputer RAM 16 GB",
+    subtitle: "Filter kapasitas memori",
+    command: "Tampilkan komputer dengan RAM 16 GB beserta kode, jenis, merek, model, dan pengguna"
+  },
+  {
+    title: "Komputer SSD 512 GB",
+    subtitle: "Filter media penyimpanan",
+    command: "Tampilkan komputer yang menggunakan SSD 512 GB"
+  },
+  {
+    title: "Komputer Windows 11",
+    subtitle: "Inventaris berdasarkan OS",
+    command: "Tampilkan komputer yang menggunakan Windows 11"
+  },
+  {
+    title: "Komputer Core i5",
+    subtitle: "Inventaris berdasarkan processor",
+    command: "Tampilkan komputer dengan processor Core i5"
+  },
+  {
+    title: "Komputer tidak aktif",
+    subtitle: "Kode status selain Y",
+    command: "Tampilkan komputer yang tidak aktif beserta kode statusnya"
+  },
+  {
+    title: "Aset perusahaan PME",
+    subtitle: "Filter pemilik aset",
+    command: "Tampilkan komputer milik perusahaan PME"
+  },
+  {
+    title: "Komputer diterima tahun ini",
+    subtitle: "Filter tanggal penerimaan",
+    command: "Tampilkan komputer yang diterima pada tahun berjalan"
+  },
+  {
+    title: "Riwayat pemegang komputer",
+    subtitle: "Data TD_ComputerHistory",
+    command: "Tampilkan riwayat pemegang komputer beserta tanggal mulai dan selesai"
+  },
+  {
+    title: "Grafik merek monitor",
+    subtitle: "Jumlah monitor per merek",
+    command: "Buat grafik jumlah monitor berdasarkan merek"
+  },
+  {
+    title: "Monitor per departemen",
+    subtitle: "Distribusi inventaris monitor",
+    command: "Buat grafik jumlah monitor berdasarkan departemen"
+  },
+  {
+    title: "Grafik merek printer",
+    subtitle: "Jumlah printer per merek",
+    command: "Buat grafik jumlah printer berdasarkan merek"
+  },
+  {
+    title: "Kebutuhan toner printer",
+    subtitle: "Jumlah printer per tipe toner",
+    command: "Buat grafik jumlah printer berdasarkan jenis toner"
+  },
+  {
+    title: "Printer departemen GA",
+    subtitle: "Inventaris printer divisi",
+    command: "Tampilkan printer yang digunakan departemen GA"
+  },
+  {
+    title: "CCTV berdasarkan lokasi",
+    subtitle: "Distribusi kamera",
+    command: "Buat grafik jumlah CCTV berdasarkan lokasi kamera"
+  },
+  {
+    title: "CCTV yang tidak aktif",
+    subtitle: "Pemeriksaan status kamera",
+    command: "Tampilkan CCTV yang statusnya tidak aktif beserta lokasi dan catatan"
+  },
+  {
+    title: "WO tingkat Sulit",
+    subtitle: "Pekerjaan kompleks",
+    command: "Tampilkan work order dengan tingkat kesulitan Sulit"
+  },
+  {
+    title: "WO berdasarkan jenis",
+    subtitle: "Perbaikan, pengadaan, dan lainnya",
+    command: "Buat grafik jumlah work order berdasarkan JenisWO"
+  },
+  {
+    title: "WO berdasarkan penyebab",
+    subtitle: "User atau perangkat",
+    command: "Buat grafik jumlah work order berdasarkan penyebab"
+  },
+  {
+    title: "WO departemen IT",
+    subtitle: "Riwayat pekerjaan divisi",
+    command: "Tampilkan work order untuk departemen IT"
+  },
+  {
+    title: "Downtime tertinggi",
+    subtitle: "Urutkan durasi penanganan",
+    command: "Tampilkan work order selesai dan urutkan berdasarkan TotalDowntime paling tinggi"
+  },
+  {
+    title: "Perangkat keras lain",
+    subtitle: "Inventaris TD_HardLain",
+    command: "Tampilkan perangkat keras lain yang masih aktif"
+  },
+  {
+    title: "Hardware lain per jenis",
+    subtitle: "Distribusi kategori perangkat",
+    command: "Buat grafik perangkat keras lain berdasarkan Jenis"
+  },
+  {
+    title: "Daftar IP perangkat lain",
+    subtitle: "Hostname, IP, dan MAC",
+    command: "Tampilkan daftar IP perangkat lain beserta hostname, pengguna, departemen, dan MAC address"
+  },
+  {
+    title: "Master jenis WO",
+    subtitle: "Referensi kategori pekerjaan",
+    command: "Tampilkan master TypeWO dan SubType work order"
+  },
+  {
+    title: "Daftar PIC IT",
+    subtitle: "Master teknisi tanpa data sensitif",
+    command: "Tampilkan daftar PIC IT beserta NRP, nama, keterangan, status blokir, dan grup"
+  },
+  {
+    title: "Lisensi per supplier",
+    subtitle: "Jumlah lisensi berdasarkan vendor",
+    command: "Buat grafik total qty lisensi berdasarkan supplier"
+  },
+  {
+    title: "Toner paling banyak dipakai",
+    subtitle: "Akumulasi berdasarkan jenis barang",
+    command: "Buat grafik total distribusi toner berdasarkan jenis barang"
   }
 ];
 
@@ -137,9 +292,17 @@ export default function ChatWindow({
   const [randomSuggestions, setRandomSuggestions] = useState<typeof ALL_SUGGESTIONS>([]);
 
   useEffect(() => {
-    const shuffled = [...ALL_SUGGESTIONS].sort(() => 0.5 - Math.random());
-    setRandomSuggestions(shuffled.slice(0, 4));
-  }, []);
+    const refreshSuggestions = () => {
+      const shuffled = [...ALL_SUGGESTIONS].sort(() => 0.5 - Math.random());
+      setRandomSuggestions(shuffled.slice(0, 4));
+    };
+
+    refreshSuggestions();
+    if (messages.length > 0) return;
+
+    const intervalId = setInterval(refreshSuggestions, 30000);
+    return () => clearInterval(intervalId);
+  }, [activeConvId, messages.length]);
 
   return (
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6 custom-scrollbar">

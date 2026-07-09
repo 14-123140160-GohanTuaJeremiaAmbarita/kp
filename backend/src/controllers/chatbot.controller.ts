@@ -11,14 +11,28 @@ export class ChatbotController {
   public chat = async (req: Request, res: Response, next: NextFunction) => {
     try {
       const { conversationId, messageText, model } = req.body;
-      if (!conversationId || !messageText) {
-        return res.status(400).json({ success: false, error: 'conversationId and messageText are required.' });
+      if (typeof conversationId !== 'string' || !conversationId.trim()) {
+        return res.status(400).json({ success: false, error: 'conversationId wajib berupa teks dan tidak boleh kosong.' });
+      }
+      if (typeof messageText !== 'string' || !messageText.trim()) {
+        return res.status(400).json({ success: false, error: 'messageText wajib berupa teks dan tidak boleh kosong.' });
+      }
+      if (messageText.length > 4000) {
+        return res.status(400).json({ success: false, error: 'messageText maksimal 4.000 karakter.' });
+      }
+      if (model !== undefined && (typeof model !== 'string' || model.length > 200)) {
+        return res.status(400).json({ success: false, error: 'model tidak valid.' });
       }
 
       const user = (req as any).user;
       const userNIK = user?.NIK || 'VOK001';
 
-      const result = await this.chatbotService.processMessage(conversationId, messageText, model, userNIK);
+      const result = await this.chatbotService.processMessage(
+        conversationId.trim(),
+        messageText.trim(),
+        model?.trim(),
+        userNIK
+      );
       res.json(result);
     } catch (error) {
       next(error);

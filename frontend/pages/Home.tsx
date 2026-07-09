@@ -51,7 +51,7 @@ export default function Home({ user, onLogout }: HomeProps) {
   const [loading, setLoading] = useState(false);
   const [loadingStats, setLoadingStats] = useState(false);
   const [inputMessage, setInputMessage] = useState('');
-  const [selectedModel, setSelectedModel] = useState('deepseek-ai/DeepSeek-V4-Flash');
+  const [selectedModel, setSelectedModel] = useState('Qwen/Qwen3-30B-A3B-Instruct-2507');
 
   // Interactive UI indicators
   const [copiedId, setCopiedId] = useState('');

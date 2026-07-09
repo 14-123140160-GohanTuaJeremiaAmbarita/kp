@@ -1,8 +1,17 @@
 // backend/src/ai/openrouter.service.ts
 import { loadEnv } from "../utils/env";
 import OpenAI from "openai";
+import tls from "node:tls";
 
 loadEnv();
+
+// Trust the Windows/system certificate store in addition to Node's bundled CAs.
+// This keeps TLS verification enabled while supporting the corporate network.
+if (typeof tls.getCACertificates === 'function' && typeof tls.setDefaultCACertificates === 'function') {
+    const defaultCAs = tls.getCACertificates('default');
+    const systemCAs = tls.getCACertificates('system');
+    tls.setDefaultCACertificates([...defaultCAs, ...systemCAs]);
+}
 
 function buildRouterSystemPrompt(schemaText: string): string {
     return `
@@ -33,7 +42,8 @@ ATURAN PEMBUATAN QUERY:
    - Koreksi dulu typo/singkatan pengguna sebelum menentukan tabel & kolom (mis. "krywn", "karywan" -> karyawan).
 
 3. FLEKSIBILITAS KOLOM (PENTING):
-   - Jika pertanyaan bersifat UMUM/LUAS dan TIDAK menyebut kolom tertentu (contoh: "tampilkan data komputer", "semua data karyawan", "berikan data HRD"), gunakan SELECT * FROM [tabel]. JANGAN menuliskan satu per satu nama seluruh kolom kalau user tidak minta detail spesifik.
+   - Jangan gunakan SELECT * pada TD_karyawan maupun TD_computer karena keduanya memiliki kolom sensitif.
+   - Untuk data komputer umum gunakan kolom aman: CodeCpu, CPU_RcptDate, Jenis, CPU_Merk, CPU_Type, CPU_SerialNo, Processor, Hardisk, Memory, Nrp, UserNama, Dept, OS, NameComp, Aktif, Keterangan, perusahaan.
    - Jika pertanyaan SPESIFIK menyebut kolom/informasi tertentu (contoh: "tampilkan merk dan tipe komputer saja", "nama dan nrp karyawan IT"), pilih HANYA kolom yang relevan dengan permintaan itu -- jangan gunakan SELECT * di kasus ini supaya hasil tetap ringkas dan relevan.
    - Untuk hasil JOIN antar tabel, tetap pilih kolom secara eksplisit (jangan SELECT * lintas tabel) supaya tidak terjadi duplikasi nama kolom yang membingungkan.
 
@@ -63,32 +73,35 @@ ATURAN PEMBUATAN QUERY:
 
 8. KECERDASAN INTERPRETASI PERTANYAAN (SANGAT PENTING):
    Sistem frontend akan merender TABEL dan GRAFIK secara otomatis berdasarkan hasil SQL yang kamu berikan. Oleh karena itu, ikuti instruksi ketat ini:
-   
+
    ATURAN MUTLAK:
    a) ATURAN KATA "GRAFIK" / "CHART":
       JIKA input pengguna MENGANDUNG kata "grafik" atau "chart" (contoh: "buatkan grafik karyawan voksel", "grafik hrd"), KAMU DILARANG KERAS menjawab GENERAL_CHAT atau meminta detail lebih lanjut. KAMU WAJIB mengeksekusi EXECUTE_SQL menggunakan kueri agregasi (COUNT GROUP BY).
       - Contoh umum: SELECT Dept, COUNT(*) AS Total FROM TD_karyawan GROUP BY Dept
       - Contoh departemen spesifik: SELECT Dept, COUNT(*) AS Total FROM TD_karyawan WHERE Dept IN ('IT', 'HRD') GROUP BY Dept
       - Contoh aset: SELECT Dept, COUNT(*) AS Total FROM TD_computer GROUP BY Dept
-   
+
    b) ATURAN KATA "DATA" ATAU PENYEBUTAN DEPARTEMEN:
       JIKA input pengguna MENGANDUNG kata "data" (misal: "berikan data karyawan it", "berikan saja tabel data nya") ATAU menyebut nama departemen (misal: "arti hrd", "penjelasan marketing"), KAMU WAJIB mengeksekusi EXECUTE_SQL. DILARANG KERAS menjawab GENERAL_CHAT.
       - "arti HRD" -> SELECT * FROM TD_karyawan WHERE Dept = 'HRD'
       - "data karyawan IT" -> SELECT * FROM TD_karyawan WHERE Dept = 'IT'
       - "tabel data semua" -> SELECT * FROM TD_karyawan
-   
+
    c) ATURAN KATA ASET / KOMPUTER / TIKET:
-      - "komputer", "PC", "laptop" -> kaitkan ke TD_computer. (Contoh: "tampilkan komputer lenovo" -> SELECT * FROM TD_computer WHERE CPU_Merk LIKE '%Lenovo%')
+      - "komputer", "PC", "laptop" -> kaitkan ke TD_computer. Contoh filter merek: WHERE CPU_Merk LIKE '%Lenovo%'.
+      - Kategori perangkat memakai Jenis: laptop/notebook = 'NOTEBOOK', desktop = 'PC', all-in-one = 'ALL IN ONE', server = 'SERVER'.
+      - CPU_Type hanya untuk model/seri seperti Optiplex, Thinkpad, atau Vostro; bukan kategori perangkat.
+      - Status aktif memakai Aktif = 'Y'; status tidak aktif memakai Aktif <> 'Y'.
       - "tiket", "masalah" -> kaitkan ke TD_TICKET
       - "work order", "WO" -> kaitkan ke TD_WO
-   
+
    d) SELAIN KATA KUNCI DI ATAS (SAPAAN & PENGETAHUAN UMUM):
       JIKA pengguna HANYA menyapa ("halo") atau bertanya hal di luar database ("siapa penemu listrik"), pelajari input dan balas dengan GENERAL_CHAT yang ramah dan suportif. Tapi jika sekecil apapun ada indikasi meminta data/tabel/grafik, kembali ke aturan a, b, atau c.
 
 CONTOH PENANGANAN QUERY (pola, bukan jawaban yang harus ditiru persis):
 
 1) "tampilkan semua data komputer" (permintaan umum/luas, tanpa sebut kolom)
-   -> SELECT * FROM TD_computer
+   -> SELECT CodeCpu, CPU_RcptDate, Jenis, CPU_Merk, CPU_Type, CPU_SerialNo, Processor, Hardisk, Memory, Nrp, UserNama, Dept, OS, NameComp, Aktif, Keterangan, perusahaan FROM TD_computer
 
 2) "tampilkan merk dan tipe komputer IT saja" (spesifik menyebut kolom)
    -> SELECT CPU_Merk, CPU_Type, NameComp FROM TD_computer WHERE Dept = 'IT'
@@ -209,20 +222,33 @@ function normalizeHistoryRole(role: string): "user" | "assistant" {
 }
 
 export class OpenRouterService {
-    private readonly DEFAULT_MODEL = "deepseek-ai/DeepSeek-V4-Flash";
+    private readonly DEFAULT_MODEL = "Qwen/Qwen3-30B-A3B-Instruct-2507";
+
+    private isSiliconFlowModel(modelName: string): boolean {
+        return [
+            'deepseek-ai/', 'Qwen/', 'zai-org/', 'MiniMaxAI/', 'moonshotai/',
+            'ByteDance-Seed/', 'inclusionAI/', 'meituan-longcat/', 'nex-agi/',
+            'stepfun-ai/', 'tencent/', 'google/gemma-', 'openai/gpt-oss-'
+        ].some(prefix => modelName.startsWith(prefix));
+    }
 
     private getClientForModel(modelName: string): OpenAI | null {
         let baseURL = "";
         let apiKey = "";
 
-        if (modelName.startsWith("anthropic/") || modelName.startsWith("google-ai-studio/") || modelName.startsWith("openai/") || modelName.startsWith("groq/")) {
+        if (this.isSiliconFlowModel(modelName)) {
+            baseURL = "https://api.siliconflow.com/v1";
+            const token = process.env.SILICONFLOW_TOKEN;
+            if (!token) throw new Error("SILICONFLOW_TOKEN is not configured in .env");
+            apiKey = token;
+        } else if (modelName.startsWith("anthropic/") || modelName.startsWith("google-ai-studio/") || modelName.startsWith("openai/") || modelName.startsWith("groq/")) {
             const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
             if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID is not configured in .env");
             baseURL = `https://gateway.ai.cloudflare.com/v1/${accountId}/default/compat`;
-            
+
             const token = process.env.CLOUDFLARE_API_TOKEN;
             if (!token) throw new Error("CLOUDFLARE_API_TOKEN is not configured in .env");
-            
+
             let providerKey = "";
             if (modelName.startsWith("google-ai-studio/")) {
                 providerKey = process.env.GOOGLE_API_KEY || "";
@@ -233,7 +259,7 @@ export class OpenRouterService {
             } else if (modelName.startsWith("groq/")) {
                 providerKey = process.env.GROQ_API_KEY || "";
             }
-            
+
             return new OpenAI({
                 baseURL,
                 apiKey: providerKey,
@@ -245,23 +271,18 @@ export class OpenRouterService {
             const accountId = process.env.CLOUDFLARE_ACCOUNT_ID;
             if (!accountId) throw new Error("CLOUDFLARE_ACCOUNT_ID is not configured in .env");
             baseURL = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/v1`;
-            
+
             const token = process.env.CLOUDFLARE_API_TOKEN;
             if (!token) throw new Error("CLOUDFLARE_API_TOKEN is not configured in .env");
             apiKey = token;
-        } else if (modelName.includes("/") && !modelName.startsWith("@cf/")) {
-            baseURL = "https://api.siliconflow.com/v1";
-            const token = process.env.SILICONFLOW_TOKEN;
-            if (!token) throw new Error("SILICONFLOW_TOKEN is not configured in .env");
-            apiKey = token;
         } else {
-            // Default fallback to GitHub Models for standard short string IDs (gpt-4o, claude-3-5-sonnet, gemini-1.5-flash)
+            // Default fallback to GitHub Models for standard short string IDs (gpt-4o, claude-3-5-sonnet, gemini-3.5-flash)
             baseURL = "https://models.inference.ai.azure.com";
             const token = process.env.GITHUB_MODELS_TOKEN;
             if (!token) throw new Error("GITHUB_MODELS_TOKEN is not configured in .env");
             apiKey = token;
         }
-        
+
         return new OpenAI({ baseURL, apiKey });
     }
 
@@ -301,10 +322,10 @@ export class OpenRouterService {
         const client = this.getClientForModel(model);
         if (!client) throw new Error("Failed to initialize OpenAI client for model: " + model);
 
-        const currentMaxTokens = maxTokens ?? 150;
+        const currentMaxTokens = maxTokens ?? 500;
 
         let finalModel = model;
-        if (model === "google-ai-studio/gemini-3.5-flash") finalModel = "google-ai-studio/gemini-2.5-flash";
+        if (model === "google-ai-studio/gemini-3.5-flash") finalModel = "google-ai-studio/gemini-3.5-flash";
         if (model === "openai/gpt-4.0") finalModel = "openai/gpt-4o";
         if (model === "openai/gpt-4.5") finalModel = "openai/gpt-4-turbo";
         if (model === "openai/gpt-5.0") finalModel = "openai/gpt-4o";
@@ -323,11 +344,29 @@ export class OpenRouterService {
             }
         }
 
-        const response = await client.chat.completions.create(requestParams);
-        const content = response.choices?.[0]?.message?.content;
-        
-        if (!content) throw new Error("OpenAI API did not return valid content.");
-        return content;
+        try {
+            // Fast-Fail Timeout: Batasi panggilan API maksimal 15 detik untuk mencegah loading menggantung
+            const response = await client.chat.completions.create(requestParams, { timeout: 15000 });
+            const content = response.choices?.[0]?.message?.content;
+
+            if (!content) {
+                console.error("[OpenRouterService] API responded but content was empty. Full response:", JSON.stringify(response, null, 2));
+                throw new Error(`AI Provider API did not return valid content. Model: ${finalModel}`);
+            }
+            return content;
+        } catch (error: any) {
+            console.error(`\n[OpenRouterService] API Call Failed for model: ${finalModel}`);
+            console.error(`Error Message: ${error.message}`);
+            if (error.response) {
+                console.error(`HTTP Status: ${error.response.status}`);
+                console.error(`Response Data:`, JSON.stringify(error.response.data, null, 2));
+            }
+            if (error.status) {
+                console.error(`Status: ${error.status}`);
+            }
+            // Rethrow with a more descriptive message
+            throw new Error(`AI Provider API Error: ${error.message}`);
+        }
     }
 
     private stripJsonFence(text: string): string {
@@ -374,105 +413,7 @@ export class OpenRouterService {
         } catch (error: any) {
             console.error('[OpenRouterService] generateContent API Call Error:', error);
             throw error;
-        }
-    }
-
-    async analyzeAndChat(
-        question: string,
-        schemaText: string,
-        history: HistoryMessage[] = [],
-        requestedModel?: string
-    ): Promise<any> {
-        const model = this.resolveModel(requestedModel);
-        const messages: OpenRouterChatMessage[] = [
-            { role: "system", content: buildRouterSystemPrompt(schemaText) },
-            ...history.map((h) => ({
-                role: normalizeHistoryRole(h.role),
-                content: h.content,
-            })),
-            { role: "user", content: question },
-        ];
-
-        const dynamicLimit = this.calculateDynamicTokens('router', question.length);
-
-        try {
-            const rawText = await this.callOpenAI(messages, 0.1, true, model, dynamicLimit);
-            const parsed = this.tryParseAiJson(rawText);
-            if (parsed) return parsed;
-
-            console.error("[AI LOG] Respons bukan JSON valid (percobaan 1), raw text:", rawText.slice(0, 300));
-        } catch (error) {
-            console.error("Gagal saat analyzeAndChat (percobaan 1):", error);
-        }
-
-        try {
-            const retryMessages: OpenRouterChatMessage[] = [
-                ...messages,
-                {
-                    role: "user",
-                    content: "PENTING: Balas HANYA dengan JSON murni sesuai format yang diminta di system prompt. Jangan ada teks penjelasan di luar JSON.",
-                },
-            ];
-            const rawText = await this.callOpenAI(retryMessages, 0.1, true, model, dynamicLimit);
-            const parsed = this.tryParseAiJson(rawText);
-            if (parsed) return parsed;
-
-            console.error("[AI LOG] Respons bukan JSON valid (percobaan 2), raw text:", rawText.slice(0, 300));
-        } catch (error) {
-            console.error("Gagal saat analyzeAndChat (percobaan 2):", error);
-        }
-
-        return {
-            action: "GENERAL_CHAT",
-            sqlQuery: "",
-            content: "Maaf, saya kesulitan memahami format jawaban untuk pertanyaan ini. Bisa dicoba tanyakan dengan kalimat yang lebih sederhana?",
-        };
-    }
-
-    async generateFinalAnswerWithData(
-        question: string,
-        databaseData: any[],
-        history: HistoryMessage[] = [],
-        requestedModel?: string
-    ): Promise<string> {
-        const stringifiedData = JSON.stringify(databaseData.slice(0, 50));
-        const promptInsight = `
-Pertanyaan pengguna:
-
-${question}
-
-Hasil query SQL:
-
-${stringifiedData}
-
-Jawablah hanya berdasarkan data di atas.
-
-Jangan membuat asumsi.
-
-Jangan menambahkan informasi yang tidak ada.
-
-Jika data berupa COUNT maka jelaskan nilai COUNT tersebut.
-
-Jika data kosong katakan bahwa tidak ditemukan data.
-
-Berikan maksimal 5 insight yang seluruhnya berasal dari data.
-`;
-
-        const dynamicLimit = this.calculateDynamicTokens('summary', question.length, databaseData.length);
-        const model = this.resolveModel(requestedModel);
-
-        try {
-            const messages: OpenRouterChatMessage[] = [
-                { role: "system", content: ANSWER_SYSTEM_PROMPT },
-                { role: "user", content: promptInsight },
-            ];
-
-            const rawText = await this.callOpenAI(messages, 0.1, false, model, dynamicLimit);
-            return rawText.trim();
-        } catch (error) {
-            console.error("Gagal saat generateFinalAnswer:", error);
-            return "Terjadi kesalahan saat merangkum data.";
-        }
+          }
     }
 }
 

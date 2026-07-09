@@ -7,6 +7,12 @@
   "scripts": {
     "dev": "ts-node-dev --respawn --transpile-only src/server.ts",
     "test:openrouter": "ts-node src/testOpenRouter.ts",
+    "test:complex": "ts-node --transpile-only src/tests/complex-input-output.ts",
+    "test:safety": "ts-node --transpile-only src/tests/sql-safety.ts",
+    "test:computer": "ts-node --transpile-only src/tests/computer-input-output.ts",
+    "test:database": "ts-node --transpile-only src/tests/database-input-output.ts",
+    "test:dashboard": "ts-node --transpile-only src/tests/dashboard-stats.ts",
+    "test:ai-sql": "ts-node --transpile-only src/tests/ai-sql-generation.ts",
     "build": "tsc",
     "start": "node dist/server.js",
     "clean": "rmdir /s /q dist"

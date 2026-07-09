@@ -15,13 +15,24 @@ interface ChatInputProps {
 }
 
 const PLACEHOLDERS = [
-  "Tanyakan data IT (misal: 'siapa pemegang komputer COM-001?')",
-  "Cari komputer (misal: 'komputer dengan merk Lenovo')",
-  "Cari karyawan (misal: 'divisi IT Support')",
-  "Tanyakan tiket IT (misal: 'tiket dari departemen GA')",
-  "Tanyakan aset (misal: 'jumlah laptop yang aktif')",
-  "Tanyakan tindakan (misal: 'tindakan perbaikan TD_WO')",
-  "Coba tanyakan: 'apa fungsi divisi HRD?'"
+  "Contoh: Tampilkan komputer aktif dengan merek Lenovo",
+  "Contoh: Berapa jumlah NOTEBOOK, PC, ALL IN ONE, dan SERVER?",
+  "Contoh: Cari komputer dengan RAM 16 GB dan SSD 512 GB",
+  "Contoh: Tampilkan aset komputer departemen HRD",
+  "Contoh: Tampilkan monitor aktif berdasarkan merek",
+  "Contoh: Cari printer aktif dan jenis tonernya",
+  "Contoh: Tampilkan work order yang masih terbuka",
+  "Contoh: Bandingkan WO selesai untuk setiap PIC IT",
+  "Contoh: Berapa rata-rata downtime per PIC IT?",
+  "Contoh: Tampilkan WO dengan tingkat kesulitan Sulit",
+  "Contoh: Buat grafik status kamera CCTV",
+  "Contoh: Tampilkan jadwal masa berlaku lisensi",
+  "Contoh: Buat grafik distribusi toner per bagian",
+  "Contoh: Cari extension telepon bagian IT",
+  "Contoh: Tampilkan perangkat keras lain yang aktif",
+  "Contoh: Tampilkan riwayat pemegang sebuah komputer",
+  "Contoh: Buat grafik karyawan aktif per departemen",
+  "Contoh: Cari IP dan MAC address berdasarkan hostname"
 ];
 
 export default function ChatInput({
@@ -50,14 +61,14 @@ export default function ChatInput({
   useEffect(() => {
     setShowDueToInactivity(false);
     
-    const timeoutId = setTimeout(() => {
+    const intervalId = setInterval(() => {
       if (!inputMessage.trim()) {
         setShowDueToInactivity(true);
         rotatePlaceholder();
       }
-    }, 30000); // 30 detik
+    }, 30000);
 
-    return () => clearTimeout(timeoutId);
+    return () => clearInterval(intervalId);
   }, [inputMessage, hasMessages]);
 
   const activePlaceholder = (!hasMessages || showDueToInactivity) ? placeholderText : "";
@@ -95,7 +106,6 @@ export default function ChatInput({
             value={inputMessage}
             onChange={(e) => setInputMessage(e.target.value)}
             onKeyDown={handleKeyDown}
-            onMouseLeave={rotatePlaceholder}
             placeholder={activePlaceholder}
             className={`w-full resize-none bg-transparent py-2.5 px-3.5 text-xs outline-none placeholder:text-slate-500 custom-scrollbar max-h-32 transition-colors ${
               isDark ? 'text-slate-100' : 'text-slate-800'

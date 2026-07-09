@@ -61,6 +61,14 @@ export class HistoryRepository {
     await this.db.addLearnedWord(word, sql);
   }
 
+  public async addQueryKnowledge(question: string, sql: string): Promise<void> {
+    await this.db.addQueryKnowledge(question, sql);
+  }
+
+  public async getQueryKnowledgeHints(limit?: number): Promise<string[]> {
+    return await this.db.getQueryKnowledgeHints(limit);
+  }
+
   // AI Memories
   public async getMemories(conversationId?: string, userNik?: string): Promise<Memory[]> {
     return await this.db.getMemories(conversationId, userNik);

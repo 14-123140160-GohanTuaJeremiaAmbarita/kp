@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Check, Copy, Database, ThumbsUp, ThumbsDown, BarChart3, Table2 } from 'lucide-react';
+import React from 'react';
+import { motion } from 'motion/react';
+import { Check, Copy, Database, ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Message } from '../../types/chat';
 import MarkdownMessage from './MarkdownMessage';
 import SqlCard from './SqlCard';
@@ -36,27 +36,10 @@ export default function ChatBubble({
 }: ChatBubbleProps) {
   const isUser = message.Sender === 'User';
   const isDark = theme === 'dark';
-  const [activeTab, setActiveTab] = useState<'chart' | 'table' | 'both'>('table');
-
-  // Pendeteksian Intent Otomatis
-  useEffect(() => {
-    if (!isUser && message.SqlResult) {
-      const q = userQuestion.toLowerCase();
-      const chartKeywords = ['grafik', 'diagram', 'chart', 'visualisasi', 'bar', 'pie', 'line'];
-      const dataKeywords = ['data', 'tabel', 'table', 'rincian', 'detail', 'semua'];
-      
-      const wantsChart = chartKeywords.some(kw => q.includes(kw));
-      const wantsData = dataKeywords.some(kw => q.includes(kw));
-      
-      if (wantsChart && wantsData) {
-        setActiveTab('both');
-      } else if (wantsChart) {
-        setActiveTab('chart');
-      } else {
-        setActiveTab('table');
-      }
-    }
-  }, [message.SqlResult, userQuestion, isUser]);
+  const normalizedQuestion = userQuestion.normalize('NFKD').toLowerCase();
+  const wantsChart = /\b(grafik|grafis|graph|chart|diagram|visualisasi|visual|plot|garfik|garifk)\b/i.test(normalizedQuestion);
+  const wantsData = /\b(data|tabel|table)\b/i.test(normalizedQuestion) || /\b(rincian|detail)\s+data\b/i.test(normalizedQuestion);
+  const displayMode: 'chart' | 'table' | 'both' = wantsChart ? (wantsData ? 'both' : 'chart') : 'table';
 
   return (
     <motion.div 
@@ -111,55 +94,14 @@ export default function ChatBubble({
           {/* Interactive Modern UI Visualizations */}
           {!isUser && message.SqlResult && (
             <div className="mt-4 flex flex-col">
-              {/* Tab Selector */}
-              <div className={`flex space-x-2 mb-4 p-1 rounded-xl w-max ${isDark ? 'bg-slate-800/50' : 'bg-slate-100'}`}>
-                <button 
-                  onClick={() => setActiveTab('table')}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    activeTab === 'table' 
-                      ? (isDark ? 'bg-slate-700 text-slate-100 shadow-sm' : 'bg-white text-slate-800 shadow-sm') 
-                      : (isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
-                  }`}
-                >
-                  <Table2 className="w-3.5 h-3.5" />
-                  <span>📋 Tabel Data</span>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('chart')}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    activeTab === 'chart' 
-                      ? (isDark ? 'bg-slate-700 text-slate-100 shadow-sm' : 'bg-white text-slate-800 shadow-sm') 
-                      : (isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
-                  }`}
-                >
-                  <BarChart3 className="w-3.5 h-3.5" />
-                  <span>📊 Grafik Interaktif</span>
-                </button>
-                <button 
-                  onClick={() => setActiveTab('both')}
-                  className={`flex items-center space-x-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
-                    activeTab === 'both' 
-                      ? (isDark ? 'bg-slate-700 text-slate-100 shadow-sm' : 'bg-white text-slate-800 shadow-sm') 
-                      : (isDark ? 'text-slate-400 hover:text-slate-300' : 'text-slate-500 hover:text-slate-700')
-                  }`}
-                >
-                  <div className="flex items-center -space-x-1">
-                    <BarChart3 className="w-3.5 h-3.5" />
-                    <Table2 className="w-3.5 h-3.5" />
-                  </div>
-                  <span>Data & Grafik</span>
-                </button>
-              </div>
-
-              {/* Tab Content */}
               <div className="relative space-y-6">
-                {(activeTab === 'chart' || activeTab === 'both') && (
+                {(displayMode === 'chart' || displayMode === 'both') && (
                   <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }}>
                     <InteractiveChart jsonResult={message.SqlResult} theme={theme} />
                   </motion.div>
                 )}
                 
-                {(activeTab === 'table' || activeTab === 'both') && (
+                {(displayMode === 'table' || displayMode === 'both') && (
                   <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="rounded-xl overflow-hidden border shadow-sm transition-colors duration-300 dark:border-slate-800 border-slate-200">
                     <DataTable jsonResult={message.SqlResult} theme={theme} />
                   </motion.div>

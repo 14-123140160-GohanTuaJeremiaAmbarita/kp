@@ -7,41 +7,34 @@ export interface ModelItem {
   name: string;
   desc: string;
   icon: string;
-  group: 'Mandatory Frontier' | 'Cost-Efficient Hemat' | 'Community Gratis';
+  group: 'Global Frontier' | 'Mandatory Frontier' | 'Cost-Efficient Hemat' | 'Community Gratis';
   cost: 'Free' | 'Low' | 'Standard' | 'Premium';
   details: string;
 }
 
 export const MODEL_WHITELIST: ModelItem[] = [
-  // ═══ A. PREMIUM FRONTIER (Tested & Working) ═══
-  { id: 'deepseek-ai/DeepSeek-V3.1', name: 'SF: DeepSeek V3', desc: 'SiliconFlow (Top Tier)', icon: '🧠', group: 'Mandatory Frontier', cost: 'Premium', details: 'High performance frontier model. ✅ Tested.' },
-  { id: 'deepseek-ai/DeepSeek-V4-Flash', name: 'SF: DeepSeek V4 Flash', desc: 'SiliconFlow (Fast)', icon: '⚡', group: 'Mandatory Frontier', cost: 'Standard', details: 'Fast, efficient standard model. ✅ Tested.' },
-  { id: 'deepseek-ai/DeepSeek-V4-Pro', name: 'SF: DeepSeek V4 Pro', desc: 'SiliconFlow (Reasoning)', icon: '🧠', group: 'Mandatory Frontier', cost: 'Premium', details: 'Deep reasoning trace. ✅ Tested.' },
-  { id: 'gpt-4o', name: 'GH: GPT-4o', desc: 'GitHub Models', icon: '🌌', group: 'Mandatory Frontier', cost: 'Premium', details: 'OpenAI flagship via GitHub. ✅ Tested (5s).' },
+  // Global Frontier (OpenRouter / Multiple Providers)
+  { id: 'openai/gpt-4o', name: 'GPT-4o', desc: 'OpenAI · Frontier', icon: '🧠', group: 'Global Frontier', cost: 'Premium', details: 'Sangat cerdas dan cepat.' },
+  { id: 'google/gemini-1.5-pro', name: 'Gemini 1.5 Pro', desc: 'Google · Frontier', icon: '✨', group: 'Global Frontier', cost: 'Premium', details: 'Konteks sangat panjang.' },
+  { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', desc: 'Anthropic · Frontier', icon: '🔶', group: 'Global Frontier', cost: 'Premium', details: 'Sangat pintar untuk coding/analisis.' },
   
-  // Cloudflare AI Gateway — Google Gemini (Working)
-  { id: 'google-ai-studio/gemini-3.5-flash', name: 'CF: Gemini 3.5 Flash', desc: 'Cloudflare Gateway', icon: '🚀', group: 'Mandatory Frontier', cost: 'Premium', details: 'Google next-gen Flash. ✅ Tested (4s).' },
-  { id: 'google-ai-studio/gemini-3.1-pro-preview', name: 'CF: Gemini 3.1 Pro', desc: 'Cloudflare Gateway', icon: '🌟', group: 'Mandatory Frontier', cost: 'Premium', details: 'Google flagship preview. ⚠️ Rate limited.' },
-  { id: 'google-ai-studio/gemini-2.5-flash', name: 'CF: Gemini 2.5 Flash', desc: 'Cloudflare Gateway', icon: '⚡', group: 'Mandatory Frontier', cost: 'Low', details: 'Google balanced fast model. ✅ Tested (3.6s).' },
-  
-  // Cloudflare AI Gateway — Anthropic (Requires Credits)
-  { id: 'anthropic/claude-sonnet-4-6', name: 'CF: Claude Sonnet 4.6', desc: 'Cloudflare Gateway', icon: '🎨', group: 'Mandatory Frontier', cost: 'Premium', details: 'Anthropic balanced. 💳 Butuh saldo Anthropic.' },
-  { id: 'anthropic/claude-opus-4-6', name: 'CF: Claude Opus 4.6', desc: 'Cloudflare Gateway', icon: '🎭', group: 'Mandatory Frontier', cost: 'Premium', details: 'Anthropic flagship. 💳 Butuh saldo Anthropic.' },
+  // Model IDs verified against GET https://api.siliconflow.com/v1/models?type=text.
+  { id: 'Qwen/Qwen3-30B-A3B-Instruct-2507', name: 'Qwen3 30B Instruct', desc: 'SiliconFlow · Default SQL', icon: '⚙️', group: 'Mandatory Frontier', cost: 'Low', details: 'Default; JSON mode telah diuji.' },
+  { id: 'deepseek-ai/DeepSeek-V4-Flash', name: 'DeepSeek V4 Flash', desc: 'SiliconFlow · Cepat', icon: '⚡', group: 'Mandatory Frontier', cost: 'Standard', details: 'JSON mode telah diuji.' },
+  { id: 'deepseek-ai/DeepSeek-V4-Pro', name: 'DeepSeek V4 Pro', desc: 'SiliconFlow · Akurasi', icon: '🧠', group: 'Mandatory Frontier', cost: 'Premium', details: 'Model frontier untuk tugas kompleks.' },
+  { id: 'deepseek-ai/DeepSeek-V3.2', name: 'DeepSeek V3.2', desc: 'SiliconFlow · General', icon: '🔷', group: 'Mandatory Frontier', cost: 'Standard', details: 'Konteks panjang dan tool support.' },
+  { id: 'Qwen/Qwen3.5-122B-A10B', name: 'Qwen3.5 122B', desc: 'SiliconFlow · Frontier', icon: '🌟', group: 'Mandatory Frontier', cost: 'Premium', details: 'Model besar untuk analisis kompleks.' },
+  { id: 'zai-org/GLM-5', name: 'GLM-5', desc: 'SiliconFlow · Frontier', icon: '🛰️', group: 'Mandatory Frontier', cost: 'Premium', details: 'Model general-purpose terbaru.' },
 
-  // Cloudflare AI Gateway — OpenAI (Requires Credits)
-  { id: 'openai/gpt-4.0', name: 'CF: GPT-4.0', desc: 'Cloudflare Gateway', icon: '🌌', group: 'Mandatory Frontier', cost: 'Premium', details: 'OpenAI top-tier. 💳 Butuh saldo OpenAI.' },
-  { id: 'openai/gpt-4.5', name: 'CF: GPT-4.5', desc: 'Cloudflare Gateway', icon: '🌟', group: 'Mandatory Frontier', cost: 'Premium', details: 'OpenAI next-gen. 💳 Butuh saldo OpenAI.' },
-  { id: 'openai/gpt-5.0', name: 'CF: GPT-5.0', desc: 'Cloudflare Gateway', icon: '🚀', group: 'Mandatory Frontier', cost: 'Premium', details: 'OpenAI future flagship. 💳 Butuh saldo OpenAI.' },
+  { id: 'Qwen/Qwen2.5-72B-Instruct', name: 'Qwen2.5 72B', desc: 'SiliconFlow · Structured', icon: '📐', group: 'Cost-Efficient Hemat', cost: 'Standard', details: 'JSON mode telah diuji.' },
+  { id: 'Qwen/Qwen3.5-35B-A3B', name: 'Qwen3.5 35B A3B', desc: 'SiliconFlow · Efisien', icon: '🚀', group: 'Cost-Efficient Hemat', cost: 'Low', details: 'MoE efisien untuk chat dan SQL.' },
+  { id: 'stepfun-ai/Step-3.5-Flash', name: 'Step 3.5 Flash', desc: 'SiliconFlow · Cepat', icon: '🏎️', group: 'Cost-Efficient Hemat', cost: 'Low', details: 'Respons cepat untuk percakapan.' },
+  { id: 'openai/gpt-oss-20b', name: 'GPT-OSS 20B', desc: 'SiliconFlow · Ringan', icon: '🧩', group: 'Cost-Efficient Hemat', cost: 'Low', details: 'Model open-weight ringan.' },
+  { id: 'openai/gpt-4o-mini', name: 'GPT-4o Mini', desc: 'OpenAI · Hemat', icon: '⚡', group: 'Cost-Efficient Hemat', cost: 'Low', details: 'Cepat dan sangat pintar.' },
+  { id: 'google/gemini-1.5-flash', name: 'Gemini 1.5 Flash', desc: 'Google · Hemat', icon: '⚡', group: 'Cost-Efficient Hemat', cost: 'Low', details: 'Cepat dengan konteks panjang.' },
 
-  // ═══ B. COMMUNITY / FREE (Tested & Working) ═══
-  { id: 'Qwen/Qwen2.5-7B-Instruct', name: 'SF: Qwen 2.5 7B', desc: 'SiliconFlow', icon: '🍃', group: 'Community Gratis', cost: 'Free', details: 'Free tier on SiliconFlow.' },
-  { id: 'meta-llama/Meta-Llama-3-8B-Instruct', name: 'SF: Llama 3 8B', desc: 'SiliconFlow', icon: '🦙', group: 'Community Gratis', cost: 'Free', details: 'Free tier on SiliconFlow.' },
-  { id: 'Mistral 7B', name: 'CF: Mistral 7B', desc: 'Cloudflare Workers AI', icon: '🌬️', group: 'Community Gratis', cost: 'Free', details: 'Lightweight Mistral on Workers AI.' },
-  { id: '@cf/deepseek-ai/deepseek-r1-distill-qwen-32b', name: 'CF: DeepSeek R1 Distill', desc: 'Cloudflare Workers AI', icon: '🧠', group: 'Community Gratis', cost: 'Free', details: 'Reasoning model distilled from R1.' },
-  { id: 'microsoft-phi-3.5-moe-instruct', name: 'GH: Phi 3.5 MoE', desc: 'GitHub Models', icon: '🧩', group: 'Community Gratis', cost: 'Free', details: 'Microsoft small efficient MoE.' },
-  { id: 'google-ai-studio/gemma-3-27b-it', name: 'CF: Gemma 3 27B', desc: 'Cloudflare Gateway', icon: '💎', group: 'Community Gratis', cost: 'Free', details: 'Google open weights 27B.' },
-  { id: 'google-ai-studio/gemma-3-12b-it', name: 'CF: Gemma 3 12B', desc: 'Cloudflare Gateway', icon: '💫', group: 'Community Gratis', cost: 'Free', details: 'Lightweight Google open weights.' },
-  { id: 'groq/llama-3.3-70b-versatile', name: 'CF: Llama 3.3 70B (Groq)', desc: 'Cloudflare Gateway', icon: '🐎', group: 'Community Gratis', cost: 'Free', details: 'Ultra-fast Groq execution.' }
+  { id: 'Qwen/Qwen2.5-7B-Instruct', name: 'Qwen2.5 7B', desc: 'SiliconFlow · Hemat', icon: '🍃', group: 'Community Gratis', cost: 'Free', details: 'Model ringan; akurasi SQL lebih terbatas.' },
+  { id: 'Qwen/Qwen3-8B', name: 'Qwen3 8B', desc: 'SiliconFlow · Hemat', icon: '🌱', group: 'Community Gratis', cost: 'Free', details: 'Cocok untuk chat sederhana.' }
 ];
 
 interface ModelSelectorProps {
@@ -66,7 +59,7 @@ export default function ModelSelector({ selectedModel, setSelectedModel, theme }
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  const activeModel = MODEL_WHITELIST.find((m) => m.id === selectedModel) || MODEL_WHITELIST[1]; // default to V4 Flash
+  const activeModel = MODEL_WHITELIST.find((m) => m.id === selectedModel) || MODEL_WHITELIST[0];
 
   const getCostBadgeStyles = (cost: string) => {
     switch (cost) {
@@ -85,6 +78,7 @@ export default function ModelSelector({ selectedModel, setSelectedModel, theme }
 
   const getGroupIcon = (group: string) => {
     switch (group) {
+      case 'Global Frontier': return <Brain className="w-3.5 h-3.5 text-purple-500" />;
       case 'Mandatory Frontier': return <Star className="w-3.5 h-3.5 text-amber-500" />;
       case 'Cost-Efficient Hemat': return <Coins className="w-3.5 h-3.5 text-blue-500" />;
       case 'Community Gratis': return <Users className="w-3.5 h-3.5 text-emerald-500" />;
@@ -99,7 +93,7 @@ export default function ModelSelector({ selectedModel, setSelectedModel, theme }
     return acc;
   }, {} as Record<string, ModelItem[]>);
 
-  const groupOrder = ['Mandatory Frontier', 'Cost-Efficient Hemat', 'Community Gratis'];
+  const groupOrder = ['Global Frontier', 'Mandatory Frontier', 'Cost-Efficient Hemat', 'Community Gratis'];
 
   return (
     <div className="relative" ref={dropdownRef}>

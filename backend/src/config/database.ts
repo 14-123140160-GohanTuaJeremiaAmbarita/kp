@@ -63,7 +63,7 @@ export async function connectDatabase() {
     historyPool = await new mssql.ConnectionPool(historyConfig).connect();
     isHistoryConnected = true;
     console.log("History Database Connected (SmartIT_AI)");
-    
+
     // Dynamically bootstrap tables in SmartIT_AI if they do not exist
     await ensureRealHistoryTablesExist(historyPool);
   } catch (err: any) {
@@ -143,7 +143,25 @@ async function ensureRealHistoryTablesExist(pool: mssql.ConnectionPool) {
       )
     `);
 
-    // 6. TD_users (for Auth storage in SmartIT_AI)
+    // 6. AI_Knowledge (Dynamic Schema & Tool Use)
+    await pool.request().query(`
+      IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='AI_Knowledge' AND xtype='U')
+      CREATE TABLE AI_Knowledge (
+        KnowledgeId UNIQUEIDENTIFIER PRIMARY KEY DEFAULT NEWID(),
+        KnowledgeType NVARCHAR(50) NOT NULL,
+        TableName NVARCHAR(100) NULL,
+        ColumnName NVARCHAR(100) NULL,
+        Metadata NVARCHAR(MAX) NULL,
+        IsWhitelisted BIT NOT NULL DEFAULT 1,
+        ReviewStatus NVARCHAR(50) NOT NULL DEFAULT 'Approved',
+        LearnedBy VARCHAR(50) NULL,
+        Confidence FLOAT NULL,
+        UsageCount INT NOT NULL DEFAULT 0,
+        LastRefreshed DATETIME2 NOT NULL DEFAULT GETDATE()
+      )
+    `);
+
+    // 7. TD_users (for Auth storage in SmartIT_AI)
     await pool.request().query(`
       IF NOT EXISTS (SELECT * FROM sysobjects WHERE name='TD_users' AND xtype='U')
       CREATE TABLE TD_users (
@@ -651,6 +669,83 @@ export class Database {
     }
   }
 
+  public async addQueryKnowledge(question: string, sql: string): Promise<void> {
+    const pool = getHistoryDbPool();
+    if (!pool) throw new Error('Database knowledge SmartIT_AI tidak terhubung.');
+
+    const metadata = JSON.stringify({ question, sql });
+    await pool.request()
+      .input('metadata', mssql.NVarChar(mssql.MAX), metadata)
+      .query(`
+        IF EXISTS (
+          SELECT 1 FROM AI_Knowledge
+          WHERE KnowledgeType = 'query_pattern' AND Metadata = @metadata
+        )
+          UPDATE AI_Knowledge
+          SET UsageCount = UsageCount + 1,
+              Confidence = CASE WHEN Confidence IS NULL OR Confidence < 1 THEN 1 ELSE Confidence END,
+              LastRefreshed = GETDATE()
+          WHERE KnowledgeType = 'query_pattern' AND Metadata = @metadata
+        ELSE
+          INSERT INTO AI_Knowledge (
+            KnowledgeId, KnowledgeType, Metadata, IsWhitelisted, ReviewStatus,
+            LearnedBy, Confidence, UsageCount, LastRefreshed
+          )
+          VALUES (
+            NEWID(), 'query_pattern', @metadata, 1, 'Approved',
+            'feedback', 1, 1, GETDATE()
+          )
+      `);
+  }
+
+  public async getQueryKnowledgeHints(limit: number = 8): Promise<string[]> {
+    const pool = getHistoryDbPool();
+    if (!pool) return [];
+
+    const safeLimit = Math.max(1, Math.min(20, Math.floor(limit)));
+    try {
+      const result = await pool.request().query(`
+        SELECT TOP ${safeLimit} Metadata
+        FROM AI_Knowledge
+        WHERE KnowledgeType = 'query_pattern'
+          AND IsWhitelisted = 1
+          AND ReviewStatus = 'Approved'
+        ORDER BY Confidence DESC, UsageCount DESC, LastRefreshed DESC
+      `);
+      return result.recordset.flatMap((row: any) => {
+        try {
+          const item = JSON.parse(row.Metadata);
+          return item.question && item.sql
+            ? [`Pertanyaan serupa: "${item.question}" -> pola SQL tervalidasi: ${item.sql}`]
+            : [];
+        } catch {
+          return [];
+        }
+      });
+    } catch (error: any) {
+      console.error('[Database] Failed to read AI_Knowledge:', error.message);
+      return [];
+    }
+  }
+
+  private stripSensitiveColumns(data: any[]): any[] {
+    if (!data || !Array.isArray(data) || data.length === 0) return data;
+    const sensitivePatterns = [
+      /pass/i, /password/i, /token/i, /secret/i, /salary/i, /gaji/i,
+      /^email_internal$/i, /^email_voksel_(?:coid|com)$/i
+    ];
+    
+    return data.map(row => {
+      const sanitizedRow = { ...row };
+      for (const key of Object.keys(sanitizedRow)) {
+        if (sensitivePatterns.some(regex => regex.test(key))) {
+          sanitizedRow[key] = '[REDACTED]';
+        }
+      }
+      return sanitizedRow;
+    });
+  }
+
   // --- Direct SQL Execution ---
   public async executeSQL(sql: string): Promise<{ success: boolean; data?: any[]; error?: string }> {
     const trimmed = sql.trim().replace(/;$/, '');
@@ -677,7 +772,8 @@ export class Database {
       try {
         console.log(`[Database Bridge] Directing query to real ITOpr SQL Server: ${sql}`);
         const res = await pool.request().query(sql);
-        return { success: true, data: res.recordset };
+        const safeData = this.stripSensitiveColumns(res.recordset);
+        return { success: true, data: safeData };
       } catch (e: any) {
         console.error('[Database Bridge] Direct query on real SQL Server failed:', e.message);
         return { success: false, error: `Kesalahan Database: ${e.message}` };
@@ -833,13 +929,33 @@ export class Database {
     const pool = getCompanyDbPool();
     if (pool) {
       try {
-        const kRes = await pool.request().query('SELECT COUNT(*) as total FROM TD_karyawan');
-        const cRes = await pool.request().query('SELECT COUNT(*) as total FROM TD_COMPUTER');
-        const tRes = await pool.request().query('SELECT COUNT(*) as total FROM TD_TICKET');
-        const oRes = await pool.request().query("SELECT COUNT(*) as total FROM TD_TICKET WHERE NoWO IS NULL OR LTRIM(RTRIM(NoWO)) = ''");
-        const rRes = await pool.request().query("SELECT COUNT(*) as total FROM TD_TICKET WHERE NoWO IS NOT NULL AND LTRIM(RTRIM(NoWO)) <> ''");
-
-        const catRes = await pool.request().query(`
+        const [
+          summaryRes, catRes, prioRes, brandRes, deptRes, empDeptRes,
+          woStatusRes, compStatusRes, compTypeRes, woTypeRes, woDifficultyRes,
+          woCauseRes, woPicRes, woTrendRes, assetDeptRes,
+          devicesTypeStatusRes, devicesUsedRes, devicesAgeCondRes
+        ] = await Promise.all([
+          pool.request().query(`
+            SELECT
+              (SELECT COUNT(*) FROM TD_karyawan WHERE status = 'Aktif') AS totalEmployees,
+              (SELECT COUNT(*) FROM TD_computer) AS totalComputers,
+              (SELECT COUNT(*) FROM TD_computer WHERE Aktif = 'Y') AS activeComputers,
+              (SELECT COUNT(*) FROM TD_computer WHERE Aktif <> 'Y') AS inactiveComputers,
+              (SELECT COUNT(*) FROM TD_monitor) AS totalMonitors,
+              (SELECT COUNT(*) FROM TD_monitor WHERE Aktif = 'Y') AS activeMonitors,
+              (SELECT COUNT(*) FROM TD_printer) AS totalPrinters,
+              (SELECT COUNT(*) FROM TD_printer WHERE Aktif = 'Y') AS activePrinters,
+              (SELECT COALESCE(SUM(COALESCE(jumlah, 1)), 0) FROM TD_CCTV) AS totalCctvUnits,
+              (SELECT COALESCE(SUM(COALESCE(qty, 1)), 0) FROM TD_License) AS totalLicenses,
+              (SELECT COUNT(*) FROM TD_TICKET) AS totalTickets,
+              (SELECT COUNT(*) FROM TD_TICKET WHERE NoWO IS NULL OR LTRIM(RTRIM(NoWO)) = '') AS openTickets,
+              (SELECT COUNT(*) FROM TD_TICKET WHERE NoWO IS NOT NULL AND LTRIM(RTRIM(NoWO)) <> '') AS resolvedTickets,
+              (SELECT COUNT(*) FROM TD_WO) AS totalWorkOrders,
+              (SELECT COUNT(*) FROM TD_WO WHERE Closed = 0) AS openWorkOrders,
+              (SELECT COUNT(*) FROM TD_WO WHERE Closed = 1) AS closedWorkOrders,
+              (SELECT COALESCE(AVG(CAST(TotalDowntime AS FLOAT)), 0) FROM TD_WO WHERE Closed = 1) AS averageDowntime
+          `),
+          pool.request().query(`
           SELECT 
             CASE 
               WHEN problem LIKE '%network%' OR problem LIKE '%koneksi%' OR problem LIKE '%lan%' OR problem LIKE '%internet%' THEN 'Network'
@@ -856,37 +972,95 @@ export class Database {
               WHEN problem LIKE '%sistem%' OR problem LIKE '%erp%' OR problem LIKE '%aplikasi%' THEN 'System'
               ELSE 'Software'
             END
-        `);
-
-        const prioRes = await pool.request().query("SELECT 'Medium' as name, COUNT(*) as value FROM TD_TICKET");
-        const brandRes = await pool.request().query('SELECT CPU_Merk as name, COUNT(*) as value FROM TD_COMPUTER GROUP BY CPU_Merk');
-
-        const deptRes = await pool.request().query(`
+          `),
+          pool.request().query("SELECT 'Belum diklasifikasikan' as name, COUNT(*) as value FROM TD_TICKET"),
+          pool.request().query('SELECT CPU_Merk as name, COUNT(*) as value FROM TD_computer GROUP BY CPU_Merk'),
+          pool.request().query(`
           SELECT k.Dept as name, COUNT(*) as value 
           FROM TD_TICKET t
           INNER JOIN TD_karyawan k ON t.NRP = k.Nrp
           GROUP BY k.Dept
-        `);
-
-        // Extra enriched stats
-        const empDeptRes = await pool.request().query('SELECT Dept as name, COUNT(*) as value FROM TD_karyawan GROUP BY Dept');
-        const woTotalRes = await pool.request().query('SELECT COUNT(*) as total FROM TD_WO');
-        
-        const woStatusRes = await pool.request().query(`
+          `),
+          pool.request().query("SELECT Dept as name, COUNT(*) as value FROM TD_karyawan WHERE status = 'Aktif' GROUP BY Dept ORDER BY value DESC"),
+          pool.request().query(`
           SELECT 
-            CASE WHEN Closed = 1 THEN 'Completed' ELSE 'In Progress' END as name, 
+            CASE WHEN Closed = 1 THEN 'Selesai' ELSE 'Terbuka' END as name,
             COUNT(*) as value 
           FROM TD_WO 
           GROUP BY Closed
-        `);
-        
-        const compStatusRes = await pool.request().query(`
+          `),
+          pool.request().query(`
           SELECT 
-            CASE WHEN Aktif = 'Y' OR Aktif = '1' OR Aktif = 'Active' THEN 'Active' ELSE 'Maintenance' END as name, 
+            CASE WHEN Aktif = 'Y' THEN 'Aktif' ELSE 'Status ' + ISNULL(Aktif, 'Kosong') END as name,
             COUNT(*) as value 
           FROM TD_computer 
           GROUP BY Aktif
-        `);
+          `),
+          pool.request().query("SELECT COALESCE(Jenis, 'Tidak diketahui') AS name, COUNT(*) AS value FROM TD_computer GROUP BY Jenis ORDER BY value DESC"),
+          pool.request().query("SELECT COALESCE(Type, 'Tidak diketahui') AS name, COUNT(*) AS value FROM TD_WO GROUP BY Type ORDER BY value DESC"),
+          pool.request().query("SELECT COALESCE(TingkatKesulitan, 'Tidak diketahui') AS name, COUNT(*) AS value FROM TD_WO GROUP BY TingkatKesulitan ORDER BY value DESC"),
+          pool.request().query("SELECT COALESCE(Penyebab, 'Tidak diketahui') AS name, COUNT(*) AS value FROM TD_WO GROUP BY Penyebab ORDER BY value DESC"),
+          pool.request().query(`
+            SELECT COALESCE(ITPic, 'Tidak diketahui') AS name,
+              COUNT(*) AS total,
+              SUM(CASE WHEN Closed = 1 THEN 1 ELSE 0 END) AS closed,
+              COALESCE(AVG(CASE WHEN Closed = 1 THEN CAST(TotalDowntime AS FLOAT) END), 0) AS averageDowntime
+            FROM TD_WO
+            GROUP BY ITPic
+            ORDER BY total DESC
+          `),
+          pool.request().query(`
+            WITH Latest AS (SELECT MAX([Date]) AS maxDate FROM TD_WO)
+            SELECT CONVERT(char(7), w.[Date], 120) AS month,
+              COUNT(*) AS total,
+              SUM(CASE WHEN Closed = 1 THEN 1 ELSE 0 END) AS closed,
+              SUM(CASE WHEN Closed = 0 THEN 1 ELSE 0 END) AS [open]
+            FROM TD_WO w CROSS JOIN Latest l
+            WHERE w.[Date] >= DATEADD(month, DATEDIFF(month, 0, l.maxDate) - 11, 0)
+            GROUP BY CONVERT(char(7), w.[Date], 120)
+            ORDER BY month
+          `),
+          pool.request().query(`
+            WITH Departments AS (
+              SELECT Dept FROM TD_computer
+              UNION SELECT Dept FROM TD_monitor
+              UNION SELECT Dept FROM TD_printer
+            )
+            SELECT COALESCE(d.Dept, 'Tidak diketahui') AS name,
+              (SELECT COUNT(*) FROM TD_computer c WHERE ISNULL(c.Dept, '') = ISNULL(d.Dept, '')) AS computers,
+              (SELECT COUNT(*) FROM TD_monitor m WHERE ISNULL(m.Dept, '') = ISNULL(d.Dept, '')) AS monitors,
+              (SELECT COUNT(*) FROM TD_printer p WHERE ISNULL(p.Dept, '') = ISNULL(d.Dept, '')) AS printers
+            FROM Departments d
+            ORDER BY (SELECT COUNT(*) FROM TD_computer c WHERE ISNULL(c.Dept, '') = ISNULL(d.Dept, '')) DESC
+          `),
+          pool.request().query(`
+            SELECT Jenis as type, Aktif, COUNT(*) as Count
+            FROM TD_computer
+            WHERE Jenis IN ('PC', 'ALL IN ONE', 'NOTEBOOK')
+            GROUP BY Jenis, Aktif
+          `),
+          pool.request().query(`
+            SELECT Jenis as type, 
+              CASE WHEN Nrp IS NOT NULL AND LTRIM(RTRIM(Nrp)) <> '' THEN 'User' ELSE 'Non-User' END as UsedType,
+              COUNT(*) as Count
+            FROM TD_computer
+            WHERE Jenis IN ('PC', 'ALL IN ONE', 'NOTEBOOK') AND Aktif = 'Y'
+            GROUP BY Jenis, CASE WHEN Nrp IS NOT NULL AND LTRIM(RTRIM(Nrp)) <> '' THEN 'User' ELSE 'Non-User' END
+          `),
+          pool.request().query(`
+            SELECT 
+              Jenis as type, 
+              ISNULL(perusahaan, 'VOKSEL') as location,
+              CASE WHEN CPU_RcptDate < DATEADD(year, -6, GETDATE()) THEN '> 6 Years' ELSE '<= 6 Years' END as ageGroup,
+              CASE WHEN Keterangan IS NOT NULL AND LTRIM(RTRIM(Keterangan)) <> '' AND Keterangan NOT IN ('OK', 'BAGUS', 'GOOD') THEN 'Not Good' ELSE 'Good' END as condition,
+              COUNT(*) as count
+            FROM TD_computer
+            WHERE Aktif = 'Y' AND Jenis IN ('PC', 'ALL IN ONE', 'NOTEBOOK')
+            GROUP BY Jenis, ISNULL(perusahaan, 'VOKSEL'),
+              CASE WHEN CPU_RcptDate < DATEADD(year, -6, GETDATE()) THEN '> 6 Years' ELSE '<= 6 Years' END,
+              CASE WHEN Keterangan IS NOT NULL AND LTRIM(RTRIM(Keterangan)) <> '' AND Keterangan NOT IN ('OK', 'BAGUS', 'GOOD') THEN 'Not Good' ELSE 'Good' END
+          `)
+        ]);
 
         // Sort and group computer brands to top 5 + "Lainnya" to prevent chart label overlaps
         const brandSorted = brandRes.recordset.map((r: any) => ({
@@ -907,20 +1081,48 @@ export class Database {
           topBrands.push({ name: 'Lainnya', value: otherValue });
         }
 
+        const summary = summaryRes.recordset[0];
+        const completionRate = summary.totalWorkOrders > 0
+          ? Number(((summary.closedWorkOrders / summary.totalWorkOrders) * 100).toFixed(1))
+          : 0;
+
         return {
-          totalEmployees: kRes.recordset[0].total,
-          totalComputers: cRes.recordset[0].total,
-          totalTickets: tRes.recordset[0].total,
-          openTickets: oRes.recordset[0].total,
-          resolvedTickets: rRes.recordset[0].total,
-          totalWorkOrders: woTotalRes.recordset[0].total,
+          ...summary,
+          completionRate,
+          averageDowntime: Math.round(summary.averageDowntime || 0),
           ticketsByCategory: catRes.recordset.map(r => ({ name: r.name || 'Software', value: r.value })),
-          ticketsByPriority: prioRes.recordset.map(r => ({ name: r.name || 'Medium', value: r.value })),
+          ticketsByPriority: prioRes.recordset.map(r => ({ name: r.name, value: r.value })),
           computersByBrand: topBrands,
+          computersByType: compTypeRes.recordset,
           ticketsByDepartment: deptRes.recordset.map(r => ({ name: r.name || 'Lainnya', value: r.value })),
           employeesByDepartment: empDeptRes.recordset.map(r => ({ name: r.name ? r.name.trim() : 'Lainnya', value: r.value })),
+          assetsByDepartment: assetDeptRes.recordset,
           woStatus: woStatusRes.recordset.map(r => ({ name: r.name || 'In Progress', value: r.value })),
-          computerStatus: compStatusRes.recordset.map(r => ({ name: r.name || 'Active', value: r.value }))
+          woByType: woTypeRes.recordset,
+          woByDifficulty: woDifficultyRes.recordset,
+          woByCause: woCauseRes.recordset,
+          woByPic: woPicRes.recordset,
+          woMonthlyTrend: woTrendRes.recordset,
+          computerStatus: compStatusRes.recordset,
+          devicesByTypeAndStatus: [
+            ...['PC', 'ALL IN ONE', 'NOTEBOOK'].map(type => {
+              const y = devicesTypeStatusRes.recordset.find(r => r.type === type && r.Aktif === 'Y')?.Count || 0;
+              const n = devicesTypeStatusRes.recordset.find(r => r.type === type && r.Aktif === 'N')?.Count || 0;
+              const p = devicesTypeStatusRes.recordset.find(r => r.type === type && r.Aktif === 'P')?.Count || 0;
+              return { type, y, n, p };
+            })
+          ],
+          devicesByUsed: [
+            ...['PC', 'ALL IN ONE', 'NOTEBOOK'].map(type => {
+              const user = devicesUsedRes.recordset.find(r => r.type === type && r.UsedType === 'User')?.Count || 0;
+              const nonUser = devicesUsedRes.recordset.find(r => r.type === type && r.UsedType === 'Non-User')?.Count || 0;
+              return { type, user, nonUser };
+            })
+          ],
+          devicesByAgeAndCondition: devicesAgeCondRes.recordset.map(r => ({
+            type: r.type, location: r.location, ageGroup: r.ageGroup, condition: r.condition, count: r.count
+          })),
+          lastUpdated: new Date().toISOString()
         };
       } catch (err: any) {
         console.error('[Database] Failed to fetch dashboard stats from real database:', err.message);
@@ -930,17 +1132,40 @@ export class Database {
     return {
       totalEmployees: 0,
       totalComputers: 0,
+      activeComputers: 0,
+      inactiveComputers: 0,
+      totalMonitors: 0,
+      activeMonitors: 0,
+      totalPrinters: 0,
+      activePrinters: 0,
+      totalCctvUnits: 0,
+      totalLicenses: 0,
       totalTickets: 0,
       openTickets: 0,
       resolvedTickets: 0,
       totalWorkOrders: 0,
+      openWorkOrders: 0,
+      closedWorkOrders: 0,
+      completionRate: 0,
+      averageDowntime: 0,
       ticketsByCategory: [],
       ticketsByPriority: [],
       computersByBrand: [],
+      computersByType: [],
       ticketsByDepartment: [],
       employeesByDepartment: [],
+      assetsByDepartment: [],
       woStatus: [],
-      computerStatus: []
+      woByType: [],
+      woByDifficulty: [],
+      woByCause: [],
+      woByPic: [],
+      woMonthlyTrend: [],
+      computerStatus: [],
+      devicesByTypeAndStatus: [],
+      devicesByUsed: [],
+      devicesByAgeAndCondition: [],
+      lastUpdated: new Date().toISOString()
     };
   }
 }
@@ -948,4 +1173,3 @@ export class Database {
 export const getDbInstance = () => {
   return Database.getInstance();
 };
-

@@ -24,3 +24,6 @@ yarn-error.log*
 # System Files
 .DS_Store
 Thumbs.db
+
+# Dokumentasi internal proyek (lokal, tidak dikirim ke repository)
+proyek.md
