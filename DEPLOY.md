@@ -32,18 +32,18 @@ APP_URL="http://localhost:5000"
 PORT=5000
 
 # SQL SERVER - DATABASE UTAMA (ITOpr)
-DB_SERVER="192.168.9.14"
+DB_SERVER="<alamat-sql-server>"
 DB_PORT=1433
 DB_DATABASE="ITOpr"
-DB_USER="itmagang"
-DB_PASSWORD="ItMangag@2026!"
+DB_USER="<pengguna-database>"
+DB_PASSWORD="<kata-sandi-database>"
 
 # SQL SERVER - HISTORY/AI DATABASE (SmartIT_AI)
 AI_DB_SERVER="localhost"
 AI_DB_PORT=1433
 AI_DB_DATABASE="SmartIT_AI"
-AI_DB_USER="smartit_ai"
-AI_DB_PASSWORD="SmartIT@2026"
+AI_DB_USER="<pengguna-database-ai>"
+AI_DB_PASSWORD="<kata-sandi-database-ai>"
 
 # OPENROUTER CONFIGURATION (Opsional jika ingin menggunakan DeepSeek/lainnya melalui OpenRouter)
 OPENROUTER_API_KEY="sk-or-v1-..."
@@ -170,3 +170,30 @@ docker run -d \
    Ini terjadi jika file static frontend di `frontend/dist` belum dibuat. Pastikan Anda telah menjalankan `npm run build` sebelum menyalakan server dalam mode production.
 3. **Akses Database Private**:
    Jika server VPS berada di luar kantor PT Voksel Electric Tbk, koneksi ke `192.168.9.14` akan gagal kecuali server tersebut telah terhubung ke VPN perusahaan atau database tersebut diekspos melalui IP publik yang aman.
+4. **Vite menampilkan `ECONNREFUSED` untuk `/api/*`**:
+   Pastikan backend aktif pada port `5000`. Dari root proyek jalankan `npm run dev`, atau jalankan `npm run dev:backend` dan `npm run dev:frontend` pada dua terminal terpisah. Periksa backend melalui `http://localhost:5000/api/health`.
+5. **Dashboard melalui ngrok terus menampilkan layar pemuatan**:
+   Gunakan `npm run tunnel:dev` hanya setelah `npm run dev` aktif. Script tunnel akan memeriksa kesiapan frontend dan backend. Frontend meminta `/api/dashboard` secara same-origin tanpa cache dan dengan header bypass peringatan ngrok, mencoba ulang hingga tiga kali, lalu mencoba memulihkan koneksi otomatis setiap 10 detik dan menyediakan tombol **Coba Lagi Sekarang**. Untuk penggunaan yang lebih stabil, jalankan mode production dengan `npm run build`, `npm run start`, lalu `npm run tunnel`.
+6. **Pembuatan sesi obrolan merespons HTTP 401**:
+   Token login sudah tidak valid atau kedaluwarsa. Frontend akan membersihkan sesi lokal dan mengarahkan pengguna ke halaman login. Login kembali melalui domain ngrok yang sedang aktif; penyimpanan sesi browser berbeda untuk setiap domain ngrok.
+
+---
+
+## 6. Validasi Dashboard
+
+Dashboard menggunakan data langsung dari database `ITOpr`. Sebelum deployment, jalankan:
+
+```bash
+npm run test:dashboard --prefix backend
+```
+
+Laporan perangkat menggunakan `TD_computer` dengan pemetaan berikut:
+
+- `Jenis`: jenis perangkat.
+- `Aktif`: status Y/N/P.
+- `UserNama`: perangkat dengan atau tanpa pengguna.
+- `CPU_RcptDate`: kelompok usia sampai dengan 6 tahun atau lebih dari 6 tahun.
+- `Check_List`: kondisi Baik (`Y`) atau Tidak Baik.
+- `perusahaan`: lokasi VOKSEL, PME, atau BPS.
+
+Laporan penggunaan serta usia/kondisi hanya memasukkan perangkat aktif (`Aktif = Y`). Judul periode laporan mengikuti waktu pembaruan data dan antarmuka dashboard ditampilkan dalam bahasa Indonesia.

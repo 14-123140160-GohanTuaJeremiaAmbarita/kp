@@ -34,6 +34,29 @@ const port = isDev ? 5173 : backendPort;
 const authToken = env.NGROK_AUTHTOKEN || process.env.NGROK_AUTHTOKEN;
 const domain = env.NGROK_DOMAIN || process.env.NGROK_DOMAIN;
 
+async function waitForService(url, label, timeoutMs = 30000) {
+  const deadline = Date.now() + timeoutMs;
+  process.stdout.write(`Menunggu ${label}`);
+
+  while (Date.now() < deadline) {
+    try {
+      const response = await fetch(url, { signal: AbortSignal.timeout(3000) });
+      if (response.ok) {
+        console.log(' siap.');
+        return;
+      }
+    } catch (_) {
+      // Layanan mungkin masih dalam proses startup.
+    }
+
+    process.stdout.write('.');
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  console.log('');
+  throw new Error(`${label} tidak siap setelah ${Math.round(timeoutMs / 1000)} detik (${url}).`);
+}
+
 // Lazy load ngrok so we can give a clean error message if npm install hasn't finished
 let ngrok;
 try {
@@ -72,6 +95,11 @@ try {
 
 
   try {
+    if (isDev) {
+      await waitForService(`http://localhost:${backendPort}/api/health`, 'Backend API');
+    }
+    await waitForService(`http://localhost:${port}`, isDev ? 'Frontend Vite' : 'Server aplikasi');
+
     const listener = await ngrok.forward(config);
     
     console.log('=========================================');

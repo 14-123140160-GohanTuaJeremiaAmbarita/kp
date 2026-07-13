@@ -7,13 +7,27 @@ export default function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    const handleExpiredSession = () => setUser(null);
+    window.addEventListener('auth:expired', handleExpiredSession);
+
+    return () => window.removeEventListener('auth:expired', handleExpiredSession);
+  }, []);
+
+  useEffect(() => {
+    const token = localStorage.getItem('token');
     const userStr = localStorage.getItem('user');
-    if (userStr) {
+
+    if (token && userStr) {
       try {
         setUser(JSON.parse(userStr));
       } catch (e) {
         console.error('Failed to parse active session user', e);
+        localStorage.removeItem('token');
+        localStorage.removeItem('user');
       }
+    } else {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
     }
     setLoading(false);
   }, []);

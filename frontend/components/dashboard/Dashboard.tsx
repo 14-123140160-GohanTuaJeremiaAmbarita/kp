@@ -44,6 +44,7 @@ import { DashboardStats } from '../../types/models';
 interface DashboardProps {
   stats: DashboardStats | null;
   loadingStats: boolean;
+  statsError?: string;
   onRefresh: () => void;
   theme?: 'light' | 'dark';
 }
@@ -333,6 +334,7 @@ function MiniProgress({
 export default function Dashboard({
   stats,
   loadingStats,
+  statsError = '',
   onRefresh,
   theme = 'light',
 }: DashboardProps) {
@@ -640,20 +642,36 @@ export default function Dashboard({
 
         <div className="relative text-center">
           <motion.div
-            animate={{ rotate: 360 }}
-            transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+            animate={loadingStats ? { rotate: 360 } : { rotate: 0 }}
+            transition={loadingStats ? { duration: 3, repeat: Infinity, ease: 'linear' } : undefined}
             className="mx-auto flex h-16 w-16 items-center justify-center rounded-3xl border border-blue-500/30 bg-blue-500/10 text-blue-400"
           >
             <Server className="h-8 w-8" />
           </motion.div>
 
           <p className={`mt-4 text-sm font-black ${dark ? 'text-slate-100' : 'text-slate-900'}`}>
-            Memuat Data Dashboard...
+            {statsError ? 'Data Dashboard Gagal Dimuat' : 'Memuat Data Dashboard...'}
           </p>
 
           <p className={`mt-1 text-xs font-medium ${dark ? 'text-slate-500' : 'text-slate-500'}`}>
-            Mengambil data langsung dari database ITOpr.
+            {statsError || 'Mengambil data langsung dari database ITOpr.'}
           </p>
+
+          {statsError && (
+            <>
+              <p className={`mt-2 text-[11px] ${dark ? 'text-slate-500' : 'text-slate-400'}`}>
+                Sistem akan mencoba kembali secara otomatis setiap 10 detik.
+              </p>
+              <button
+                type="button"
+                onClick={onRefresh}
+                disabled={loadingStats}
+                className="mt-5 rounded-xl bg-blue-600 px-5 py-2.5 text-xs font-black text-white transition hover:bg-blue-500 disabled:opacity-60"
+              >
+                {loadingStats ? 'Mencoba Lagi...' : 'Coba Lagi Sekarang'}
+              </button>
+            </>
+          )}
         </div>
       </div>
     );

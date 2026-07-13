@@ -46,6 +46,7 @@ export default function Home({ user, onLogout }: HomeProps) {
   const [activeConvId, setActiveConvId] = useState<string>('');
   const [messages, setMessages] = useState<Message[]>([]);
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [statsError, setStatsError] = useState('');
 
   // Loading & Inputs
   const [loading, setLoading] = useState(false);
@@ -91,6 +92,17 @@ export default function Home({ user, onLogout }: HomeProps) {
     fetchConversations();
     fetchStats();
   }, []);
+
+  // Pulihkan dashboard otomatis jika backend/tunnel baru siap setelah halaman dibuka.
+  useEffect(() => {
+    if (!statsError || stats || loadingStats) return;
+
+    const retryTimer = window.setTimeout(() => {
+      fetchStats();
+    }, 10000);
+
+    return () => window.clearTimeout(retryTimer);
+  }, [statsError, stats, loadingStats]);
 
   // Fetch messages when active conversation changes
   useEffect(() => {
@@ -268,14 +280,25 @@ export default function Home({ user, onLogout }: HomeProps) {
 
   const fetchStats = async () => {
     setLoadingStats(true);
-    try {
-      const data = await fetchStatsApi();
-      setStats(data);
-    } catch (e) {
-      console.error('Error fetching stats', e);
-    } finally {
-      setLoadingStats(false);
+    setStatsError('');
+
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      try {
+        const data = await fetchStatsApi();
+        setStats(data);
+        setLoadingStats(false);
+        return;
+      } catch (error) {
+        console.error(`Gagal mengambil statistik (percobaan ${attempt}/3)`, error);
+
+        if (attempt < 3) {
+          await new Promise((resolve) => setTimeout(resolve, attempt * 1000));
+        }
+      }
     }
+
+    setStatsError('Data dashboard gagal dimuat. Pastikan backend dan tunnel ngrok aktif, lalu coba lagi.');
+    setLoadingStats(false);
   };
 
   const handleCreateConversation = () => {
@@ -343,7 +366,9 @@ export default function Home({ user, onLogout }: HomeProps) {
         currentConvId = conversation.ConversationID;
       } catch (e: any) {
         console.error('Error auto-creating conversation', e);
-        triggerToast('Gagal membuat sesi obrolan baru: ' + e.message, 'error');
+        if (e.response?.status !== 401) {
+          triggerToast('Gagal membuat sesi obrolan baru. Silakan coba kembali.', 'error');
+        }
         setLoading(false);
         setMessages(prev => prev.filter(m => m.MessageID !== tempUserMsg.MessageID));
         return;
@@ -516,6 +541,7 @@ export default function Home({ user, onLogout }: HomeProps) {
           <Dashboard
             stats={stats}
             loadingStats={loadingStats}
+            statsError={statsError}
             onRefresh={fetchStats}
             theme={theme}
           />

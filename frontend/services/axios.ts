@@ -2,8 +2,10 @@ import axios from 'axios';
 
 const api = axios.create({
   baseURL: '/api',
+  timeout: 20000,
   headers: {
     'Content-Type': 'application/json',
+    'ngrok-skip-browser-warning': 'true',
   },
 });
 
@@ -26,5 +28,18 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      localStorage.removeItem('token');
+      localStorage.removeItem('user');
+      window.dispatchEvent(new CustomEvent('auth:expired'));
+    }
+
+    return Promise.reject(error);
+  }
+);
 
 export default api;

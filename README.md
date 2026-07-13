@@ -1,54 +1,96 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# Smart IT Assistant PT Voksel Electric Tbk
 
-# Run and deploy your AI Studio app
+Aplikasi dashboard operasional dan asisten IT yang menggunakan React, Vite, Express, TypeScript, serta Microsoft SQL Server.
 
-This contains everything you need to run your app locally.
+## Fitur Utama
 
-View your app in AI Studio: https://ai.studio/apps/74494a64-530a-400c-9385-96772f79f376
+- Dashboard operasional IT berbahasa Indonesia.
+- Ringkasan karyawan, komputer, monitor, pencetak, CCTV, lisensi, tiket, dan perintah kerja.
+- Laporan perangkat berdasarkan jenis, status, penggunaan, usia, kondisi, dan lokasi perusahaan.
+- Asisten percakapan untuk pencarian data operasional.
+- Riwayat percakapan dan memori pengguna.
 
-## Run Locally
+## Sumber Data Dashboard
 
-**Prerequisites:**  Node.js
+Seluruh angka dashboard diambil dari database `ITOpr`. Laporan perangkat menggunakan aturan berikut:
 
+| Informasi | Tabel/Kolom | Aturan |
+| --- | --- | --- |
+| Jenis perangkat | `TD_computer.Jenis` | PC, ALL IN ONE, dan NOTEBOOK |
+| Status | `TD_computer.Aktif` | `Y` = Aktif, `N` = Tidak Aktif, `P` = Usulan Penghapusan Aset |
+| Penggunaan | `TD_computer.UserNama` | Terisi = Pengguna, kosong = Tanpa Pengguna |
+| Usia | `TD_computer.CPU_RcptDate` | Dikelompokkan menjadi `<= 6 Tahun` dan `> 6 Tahun` |
+| Kondisi | `TD_computer.Check_List` | `Y` = Baik, selain `Y` = Tidak Baik |
+| Lokasi | `TD_computer.perusahaan` | VOKSEL, PME, atau BPS |
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+Laporan penggunaan serta usia dan kondisi hanya menghitung perangkat berstatus aktif (`Aktif = Y`).
 
-## Ekspos Aplikasi Menggunakan Ngrok (Public Access)
+## Menjalankan secara Lokal
 
-Anda dapat menggunakan **ngrok** untuk membuat terowongan (tunnel) aman dari localhost ke internet. Ini berguna untuk membagikan aplikasi secara publik, melakukan testing di perangkat lain, atau integrasi webhook eksternal.
+Prasyarat: Node.js dan akses ke kedua database SQL Server.
 
-### 1. Konfigurasi Token Ngrok (Opsional tapi Sangat Direkomendasikan)
-Agar tunnel tidak kedaluwarsa setelah 2 jam dan memiliki limit rate yang lebih longgar, tambahkan token autentikasi ngrok Anda:
-1. Daftar atau masuk ke [ngrok Dashboard](https://dashboard.ngrok.com/).
-2. Salin token autentikasi Anda (Authtoken).
-3. Buka file `backend/.env` dan masukkan token tersebut pada field:
-   ```env
-   NGROK_AUTHTOKEN="token_ngrok_anda_di_sini"
-   ```
+```powershell
+npm run install:all
+npm run dev
+```
 
-### 2. Cara Menjalankan Tunnel
+Perintah tersebut menjalankan:
 
-Buka terminal baru di root direktori proyek, lalu jalankan salah satu perintah berikut sesuai dengan mode yang Anda gunakan:
+- Frontend Vite: `http://localhost:5173`
+- Backend API: `http://localhost:5000`
+- Pemeriksaan backend: `http://localhost:5000/api/health`
 
-*   **Mode Produksi (Port 5000)**
-    Jika Anda menjalankan aplikasi terpadu (setelah melakukan `npm run build` lalu `npm run start`):
-    ```bash
-    npm run tunnel
-    ```
-    Perintah ini akan mengekspos gabungan backend & frontend statis secara publik melalui port 5000.
+Jika ingin menggunakan dua terminal:
 
-*   **Mode Pengembangan / Dev (Port 5173)**
-    Jika Anda menjalankan aplikasi dalam mode dev (`npm run dev`):
-    ```bash
-    npm run tunnel:dev
-    ```
-    Perintah ini akan mengekspos server pengembangan Vite (port 5173), yang secara otomatis mem-proxy request API `/api/*` ke backend port 5000 secara lokal.
+```powershell
+npm run dev:backend
+```
 
-# kp1
-# kp
+```powershell
+npm run dev:frontend
+```
+
+Jangan hanya menjalankan `npm run dev` dari folder `frontend`. Frontend membutuhkan backend pada port `5000`; jika backend tidak aktif, Vite akan menampilkan `ECONNREFUSED` untuk `/api/dashboard` dan `/api/conversations`.
+
+Saat diakses melalui ngrok, request API memiliki timeout 20 detik dan dashboard akan mencoba ulang hingga tiga kali. Jika tetap gagal, dashboard menampilkan tombol **Coba Lagi Sekarang** serta mencoba memulihkan koneksi secara otomatis setiap 10 detik.
+
+Request dashboard menggunakan koneksi same-origin langsung ke `/api/dashboard` tanpa interceptor sesi, memakai `cache: no-store`, cache-buster, dan header bypass halaman peringatan ngrok. Hal ini mencegah respons HTML peringatan atau cache lama terbaca sebagai data API.
+
+Jika token login kedaluwarsa atau ditolak dengan HTTP 401, data sesi lokal otomatis dibersihkan dan pengguna dikembalikan ke halaman login. UI tidak mempertahankan status login palsu atau menampilkan pesan teknis Axios.
+
+## Build dan Pengujian
+
+```powershell
+npm run build
+npm run test:dashboard --prefix backend
+```
+
+Pengujian dashboard memeriksa koneksi database dan memastikan total perangkat aktif konsisten antara laporan status, penggunaan, serta usia/kondisi.
+
+## Konfigurasi
+
+Konfigurasi database dan layanan AI disimpan dalam `backend/.env`. Jangan memasukkan file tersebut ke repositori publik.
+
+Lihat [DEPLOY.md](DEPLOY.md) untuk panduan deployment production.
+
+## Akses Publik dengan Ngrok
+
+Mode production pada port `5000`:
+
+```powershell
+npm run tunnel
+```
+
+Mode development pada port `5173`:
+
+```powershell
+npm run tunnel:dev
+```
+
+Script tunnel memeriksa kesiapan backend dan frontend sebelum membuat URL publik. Untuk akses yang lebih stabil dan ringan tanpa proxy Vite, gunakan mode production:
+
+```powershell
+npm run build
+npm run start
+npm run tunnel
+```
